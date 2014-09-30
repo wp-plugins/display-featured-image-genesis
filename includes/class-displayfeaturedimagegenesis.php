@@ -22,14 +22,29 @@ class Display_Featured_Image_Genesis {
 
 	public function run() {
 		if ( basename( get_template_directory() ) !== 'genesis' ) {
+			add_action( 'admin_init', array( $this, 'deactivate' ) );
 			add_action( 'admin_notices', array( $this, 'error_message' ) );
 			return;
 		}
 		add_action( 'plugins_loaded', array( $this, 'load_textdomain' ) );
 		add_action( 'admin_init', array( $this->settings, 'register_settings' ) );
 		add_action( 'load-options-media.php', array( $this->settings, 'help' ) );
-		add_action( 'wp_enqueue_scripts', array( $this->output, 'load_scripts' ) );
-		add_filter( 'body_class', array( $this->output, 'add_body_class' ) );
+		add_action( 'get_header', array( $this->output, 'manage_output' ) );
+	}
+
+	/**
+	 * deactivates the plugin if Genesis isn't running
+	 *
+	 *  @since 1.1.2
+	 *
+	 */
+	public function deactivate() {
+		if ( version_compare( PHP_VERSION, '5.3', '>=' ) ) {
+			deactivate_plugins( plugin_basename( dirname( __DIR__ ) ) . '/display-featured-image-genesis.php' ); // __DIR__ is a magic constant introduced in PHP 5.3
+		}
+		else {
+			deactivate_plugins( plugin_basename( dirname( dirname( __FILE__ ) ) ) . '/display-featured-image-genesis.php' );
+		}
 	}
 
 	/**
@@ -38,11 +53,20 @@ class Display_Featured_Image_Genesis {
 	 * @since 1.1.0
 	 */
 	public function error_message() {
-		echo '<div class="error"><p>' . sprintf(
-			__( 'Sorry, Display Featured Image for Genesis works only with the Genesis Framework. You can <a href="%1$s">deactivate the plugin</a>, since it is not working anyway, or you can <a href="%2$s">activate a Genesis child theme</a>.', 'display-featured-image-genesis' ),
-			esc_url( admin_url( 'plugins.php' ) ),
-			esc_url( admin_url( 'themes.php' ) )
-			) . '</p></div>';
+		if ( version_compare( PHP_VERSION, '5.3', '>=' ) ) {
+			echo '<div class="error"><p>' . sprintf(
+				__( 'Sorry, Display Featured Image for Genesis works only with the Genesis Framework. It has been deactivated.', 'display-featured-image-genesis' ) ) . '</p></div>';
+		}
+		else {
+			echo '<div class="error"><p>' . sprintf(
+				__( 'Sorry, Display Featured Image for Genesis works only with the Genesis Framework. It has been deactivated. But since we&#39;re talking anyway, did you know that your server is running PHP version %1$s, which is outdated? You should ask your host to update that for you.', 'display-featured-image-genesis' ),
+				PHP_VERSION
+				) . '</p></div>';
+		}
+
+		if ( isset( $_GET['activate'] ) ) {
+			unset( $_GET['activate'] );
+		}
 	}
 
 	/**
