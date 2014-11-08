@@ -15,49 +15,17 @@ class Display_Featured_Image_Genesis_Output {
 	 * @since 1.1.3
 	 */
 	public function manage_output() {
-		if ( in_array( get_post_type(), $this->get_skipped_posttypes() ) ) {
+		$displaysetting = get_option( 'displayfeaturedimagegenesis' );
+		$fallback       = $displaysetting['default'];
+		if ( is_admin() || ( empty( $fallback ) && ! is_home() && ! is_singular() ) || ( in_array( get_post_type(), Display_Featured_Image_Genesis_Common::get_skipped_posttypes() ) ) ) {
 			return;
 		}
-		elseif ( is_home() || is_singular() ) {
-			add_action( 'wp_enqueue_scripts', array( $this, 'load_scripts' ) );
-			add_filter( 'body_class', array( $this, 'add_body_class' ) );
-		}
-	}
 
-	/**
-	 * set and retreive variables for the featured image.
-	 * @return $item
-	 *
-	 * @since  1.1.0
-	 */
-	protected function get_image_variables() {
-		$item = new stdClass();
-		global $post;
-		if ( is_home() ) {
-			$postspage      = get_option( 'page_for_posts' );
-			$item->original = wp_get_attachment_image_src( get_post_thumbnail_id( $postspage ), 'original' );
-		}
-		else {
-			$item->original = wp_get_attachment_image_src( get_post_thumbnail_id( $post->ID ), 'original' );
-		}
-		$item->large   = get_option( 'large_size_w' );
-		$item->medium  = get_option( 'medium_size_w' );
-		$item->reduce  = get_option( 'displayfeaturedimage_less_header', 0 );
-		$item->content = strpos( $post->post_content, $item->original[0] );
-
-		return $item;
+		add_action( 'wp_enqueue_scripts', array( $this, 'load_scripts' ) );
+		add_filter( 'body_class', array( $this, 'add_body_class' ) );
 
 	}
 
-	/**
-	 * skip certain post types
-	 * @return filter creates a new filter for themes/plugins to use to skip certain post types
-	 *
-	 * @since 1.0.1
-	 */
-	public function get_skipped_posttypes() {
-		return apply_filters( 'display_featured_image_genesis_skipped_posttypes', array( 'attachment', 'revision', 'nav_menu_item' ) );
-	}
 
 	/**
 	 * enqueue plugin styles and scripts.
@@ -67,22 +35,27 @@ class Display_Featured_Image_Genesis_Output {
 	 */
 	public function load_scripts() {
 
-		$item = $this->get_image_variables();
-		if ( ( has_post_thumbnail() && $item->content === false ) || is_home() ) {
+		$item = Display_Featured_Image_Genesis_Common::get_image_variables();
+		if ( ( ! empty( $item->backstretch ) && false === $item->content ) || ( ! is_singular() && ! empty( $item->backstretch ) ) ) {
 
 			wp_enqueue_style( 'displayfeaturedimage-style', plugins_url( 'includes/css/display-featured-image-genesis.css', dirname( __FILE__ ) ), array(), 1.0 );
 
-			add_action( 'genesis_before', array( $this, 'do_featured_image' ) );
-
-			if ( ( $item->original[1] ) > $item->large ) {
+			if ( $item->backstretch[1] > $item->large ) {
 				wp_enqueue_script( 'displayfeaturedimage-backstretch', plugins_url( '/includes/js/backstretch.js', dirname( __FILE__ ) ), array( 'jquery' ), '1.0.0' );
 				wp_enqueue_script( 'displayfeaturedimage-backstretch-set', plugins_url( '/includes/js/backstretch-set.js', dirname( __FILE__ ) ), array( 'jquery', 'displayfeaturedimage-backstretch' ), '1.0.0' );
 
 				wp_localize_script( 'displayfeaturedimage-backstretch-set', 'BackStretchVars', array(
-					'src' => $item->original[0],
+					'src'    => esc_url( $item->backstretch[0] ),
 					'height' => esc_attr( $item->reduce )
-				));
+				) );
 
+				add_action( 'genesis_after_header', array( $this, 'do_backstretch_image_title' ) );
+
+			}
+
+			elseif ( ( $item->backstretch[1] <= $item->large ) && ( $item->backstretch[1] > $item->medium ) ) {
+				add_action( 'genesis_before_entry', array( $this, 'do_large_image' ) ); // HTML5
+				add_action( 'genesis_before_post', array( $this, 'do_large_image' ) );  // XHTML
 			}
 		}
 	}
@@ -96,13 +69,13 @@ class Display_Featured_Image_Genesis_Output {
 	public function add_body_class( $classes ) {
 		global $post;
 
-		$item = $this->get_image_variables();
+		$item = Display_Featured_Image_Genesis_Common::get_image_variables();
 
-		if ( $item->content === false ) {
-			if ( ( has_post_thumbnail() || is_home() ) && $item->original[1] > $item->large ) {
+		if ( ( ! empty( $item->backstretch ) && false === $item->content ) || ( ! is_singular() && ! empty( $item->backstretch ) ) ) {
+			if ( $item->backstretch[1] > $item->large ) {
 				$classes[] = 'has-leader';
 			}
-			elseif ( has_post_thumbnail() && ( ( $item->original[1] <= $item->large ) && ( $item->original[1] > $item->medium ) ) ) {
+			elseif ( ( $item->backstretch[1] <= $item->large ) && ( $item->backstretch[1] > $item->medium ) ) {
 				$classes[] = 'large-featured';
 			}
 		}
@@ -110,52 +83,53 @@ class Display_Featured_Image_Genesis_Output {
 	}
 
 	/**
-	 * do the featured image
+	 * backstretch image title (for images which are larger than Media Settings > Large )
 	 * @return image
 	 *
 	 * @since  1.0.0
 	 */
-	public function do_featured_image() {
-		global $post;
+	public function do_backstretch_image_title() {
 
-		$item = $this->get_image_variables();
+		$item = Display_Featured_Image_Genesis_Common::get_image_variables();
 
-		if ( $item->content === false ) {
-			if ( $item->original[1] > $item->large ) {
-				add_action( 'genesis_after_header', array( $this, 'do_backstretch_image' ) );
-			}
-			elseif ( ( $item->original[1] <= $item->large ) && ( $item->original[1] > $item->medium ) ) {
-				add_action( 'genesis_before_entry', array( $this, 'do_large_image' ) ); // HTML5
-				add_action( 'genesis_before_post', array( $this, 'do_large_image' ) );  // XHTML
-			}
-		}
-
-	}
-
-	/**
-	 * backstretch image (for images which are larger than Media Settings > Large )
-	 * @return image
-	 *
-	 * @since  1.0.0
-	 */
-	public function do_backstretch_image() {
-
-		$item = $this->get_image_variables();
-
-		if ( ! is_home() ) {
+		if ( is_singular() && ! is_front_page() ) {
 			remove_action( 'genesis_entry_header', 'genesis_do_post_title' ); // HTML5
 			remove_action( 'genesis_post_title', 'genesis_do_post_title' ); // XHTML
 		}
 
+		remove_action( 'genesis_before_loop', 'genesis_do_taxonomy_title_description', 15 );
+		remove_action( 'genesis_before_loop', 'genesis_do_author_title_description', 15 );
+		remove_action( 'genesis_before_loop', 'genesis_do_cpt_archive_title_description' );
+
+
 		echo '<div class="big-leader"><div class="wrap">';
-		if ( is_home() ) {
-			$title = get_post( get_option( 'page_for_posts' ) )->post_title;
-			echo '<h1 class="entry-title">' . $title . '</h1>';
-		}
-		else {
-			echo '<h1 class="entry-title">' . get_the_title() . '</h1>';
+		$displaysetting = get_option( 'displayfeaturedimagegenesis' );
+		$move_excerpts  = $displaysetting['move_excerpts'];
+
+		// if move excerpts is enabled
+		if ( $move_excerpts && ! in_array( get_post_type(), Display_Featured_Image_Genesis_Common::omit_excerpt() ) ) {
+
+			Display_Featured_Image_Genesis_Description::do_front_blog_excerpt();
+			Display_Featured_Image_Genesis_Description::do_excerpt();
+			genesis_do_taxonomy_title_description();
+			genesis_do_author_title_description();
+			genesis_do_cpt_archive_title_description();
+
 		}
 
+		else {
+
+			if ( ! empty( $item->title ) && ! is_front_page() ) {
+				echo '<h1 class="entry-title featured-image-overlay">' . esc_attr( $item->title ) . '</h1>';
+			}
+
+			remove_action( 'genesis_before_loop', 'genesis_do_cpt_archive_title_description' );
+			remove_action( 'genesis_before_loop', 'genesis_do_taxonomy_title_description', 15 );
+			remove_action( 'genesis_before_loop', 'genesis_do_author_title_description', 15 );
+
+			add_action( 'genesis_before_loop', array( $this, 'move_titles' ) );
+
+		}
 		echo '</div></div>';
 	}
 
@@ -167,7 +141,26 @@ class Display_Featured_Image_Genesis_Output {
 	 */
 	public function do_large_image() {
 		global $post;
-		echo get_the_post_thumbnail( $post->ID, 'large', array( 'class' => 'aligncenter featured', 'alt' => the_title_attribute( 'echo=0' ) ) );
+		$image = get_the_post_thumbnail( $post->ID, 'large', array( 'class' => 'aligncenter featured', 'alt' => the_title_attribute( 'echo=0' ) ) );
+
+		echo $image;
+	}
+
+	/**
+	 * Separate archive titles from descriptions. Titles show in leader image
+	 * area; descriptions show before loop.
+	 *
+	 * @return descriptions
+	 *
+	 * @since  1.3.0
+	 *
+	 */
+	public function move_titles() {
+
+		Display_Featured_Image_Genesis_Description::do_tax_description();
+		Display_Featured_Image_Genesis_Description::do_author_description();
+		Display_Featured_Image_Genesis_Description::do_cpt_archive_description();
+
 	}
 
 }
