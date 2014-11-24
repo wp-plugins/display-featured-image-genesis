@@ -49,6 +49,7 @@ class Display_Featured_Image_Genesis_Settings {
 			echo '<form action="options.php" method="post">';
 				settings_fields( 'displayfeaturedimagegenesis' );
 				do_settings_sections( 'displayfeaturedimagegenesis' );
+				wp_nonce_field( 'displayfeaturedimagegenesis_save-settings', 'displayfeaturedimagegenesis_nonce', false );
 				submit_button();
 				settings_errors();
 			echo '</form>';
@@ -65,12 +66,14 @@ class Display_Featured_Image_Genesis_Settings {
 
 		register_setting( 'displayfeaturedimagegenesis', 'displayfeaturedimagegenesis', array( $this, 'do_validation_things' ) );
 
-		$this->displaysetting = get_option( 'displayfeaturedimagegenesis', array(
+		$defaults = array(
 			'less_header'   => 0,
 			'default'       => '',
 			'exclude_front' => 0,
 			'move_excerpts' => 0
-		) );
+		);
+
+		$this->displaysetting = get_option( 'displayfeaturedimagegenesis', $defaults );
 
 		add_settings_section(
 			'display_featured_image_section',
@@ -160,7 +163,7 @@ class Display_Featured_Image_Genesis_Settings {
 		echo '<input id="upload_default_image" type="button" class="upload_default_image button" value="' . __( 'Select Default Image', 'display-featured-image-genesis' ) . '" />';
 		echo '<p class="description">' . sprintf(
 			__( 'If you would like to use a default image for the featured image, upload it here. Must be at least %1$s pixels wide.', 'display-featured-image-genesis' ),
-			absint( $item->large+1 )
+			absint( $item->large + 1 )
 		) . '</p>';
 	}
 
@@ -171,7 +174,8 @@ class Display_Featured_Image_Genesis_Settings {
 	 * @since  1.4.0
 	 */
 	public function exclude_front() {
-		echo '<input type="checkbox" name="displayfeaturedimagegenesis[exclude_front]" id="displayfeaturedimagegenesis[exclude_front]" value="1"' . checked( 1, $this->displaysetting['exclude_front'], false ) . ' class="code" /> <label for="displayfeaturedimagegenesis[exclude_front]">' . __( 'Do not show the Featured Image on the Front Page of the site.', 'display-featured-image-genesis' ) . '</label>';
+		echo '<input type="hidden" name="displayfeaturedimagegenesis[exclude_front]" value="0" />';
+		echo '<label for="displayfeaturedimagegenesis[exclude_front]"><input type="checkbox" name="displayfeaturedimagegenesis[exclude_front]" id="displayfeaturedimagegenesis[exclude_front]" value="1"' . checked( 1, esc_attr( $this->displaysetting['exclude_front'] ), false ) . ' class="code" />' . __( 'Do not show the Featured Image on the Front Page of the site.', 'display-featured-image-genesis' ) . '</label>';
 	}
 
 	/**
@@ -181,7 +185,8 @@ class Display_Featured_Image_Genesis_Settings {
 	 * @since  1.3.0
 	 */
 	public function move_excerpts() {
-		echo '<input type="checkbox" name="displayfeaturedimagegenesis[move_excerpts]" id="displayfeaturedimagegenesis[move_excerpts]" value="1"' . checked( 1, $this->displaysetting['move_excerpts'], false ) . ' class="code" /> <label for="displayfeaturedimagegenesis[move_excerpts]">' . __( 'Move excerpts (if used) on single pages and move archive/taxonomy descriptions to overlay the Featured Image.', 'display-featured-image-genesis' ) . '</label>';
+		echo '<input type="hidden" name="displayfeaturedimagegenesis[move_excerpts]" value="0" />';
+		echo '<label for="displayfeaturedimagegenesis[move_excerpts]"><input type="checkbox" name="displayfeaturedimagegenesis[move_excerpts]" id="displayfeaturedimagegenesis[move_excerpts]" value="1"' . checked( 1, esc_attr( $this->displaysetting['move_excerpts'] ), false ) . ' class="code" />' . __( 'Move excerpts (if used) on single pages and move archive/taxonomy descriptions to overlay the Featured Image.', 'display-featured-image-genesis' ) . '</label>';
 	}
 
 	/**
@@ -192,6 +197,12 @@ class Display_Featured_Image_Genesis_Settings {
 	 * @since  1.4.0
 	 */
 	public function do_validation_things( $new_value ) {
+
+		if ( empty( $_POST['displayfeaturedimagegenesis_nonce'] ) ) {
+			wp_die( __( 'Something unexpected happened. Please try again.', 'display-featured-image-genesis' ) );
+		}
+
+		check_admin_referer( 'displayfeaturedimagegenesis_save-settings', 'displayfeaturedimagegenesis_nonce' );
 
 		$new_value['less_header']   = absint( $new_value['less_header'] );
 
@@ -217,7 +228,8 @@ class Display_Featured_Image_Genesis_Settings {
 		$valid     = $this->is_valid_img_ext( $new_value );
 		$large     = get_option( 'large_size_w' );
 		$id        = Display_Featured_Image_Genesis_Common::get_image_id( $new_value );
-		$file      = wp_get_attachment_image_src( $id, 'original' );
+		$metadata  = wp_get_attachment_metadata( $id );
+		$width     = $metadata['width'];
 
 		// ok for field to be empty
 		if ( $new_value ) {
@@ -234,7 +246,7 @@ class Display_Featured_Image_Genesis_Settings {
 				);
 			}
 			// if file is an image, but is too small, throw it back
-			elseif ( $file[1] <= $large ) {
+			elseif ( $width <= $large ) {
 				$message   = __( 'Sorry, your image is too small. The Default Featured Image has been reset to the last valid setting.', 'display-featured-image-genesis' );
 				$new_value = $this->displaysetting['default'];
 
@@ -285,7 +297,7 @@ class Display_Featured_Image_Genesis_Settings {
 	 * @param mixed $new_value Should ideally be a 1 or 0 integer passed in
 	 * @return integer 1 or 0.
 	 */
-	public function one_zero( $new_value ) {
+	protected function one_zero( $new_value ) {
 		return (int) (bool) $new_value;
 	}
 
@@ -308,7 +320,7 @@ class Display_Featured_Image_Genesis_Settings {
 			'<p>' . __( 'You may set a large image to be used sitewide if a featured image is not available. This image will show on posts, pages, and archives.', 'display-featured-image-genesis' ) . '</p>' .
 			'<p>' . sprintf(
 				__( 'Supported file types are: jpg, jpeg, png, and gif. The image must be at least %1$s pixels wide.', 'display-featured-image-genesis' ),
-				absint( $large+1 )
+				absint( $large + 1 )
 			) . '</p>';
 
 		$skipfront_help =
@@ -357,7 +369,9 @@ class Display_Featured_Image_Genesis_Settings {
 	 * @since  1.2.1
 	 */
 	public function enqueue_scripts() {
-		wp_register_script( 'displayfeaturedimage-upload', plugins_url( '/includes/js/settings-upload.js', dirname( __FILE__ ) ), array( 'jquery', 'media-upload', 'thickbox' ), '1.0.0' );
+		$version = Display_Featured_Image_Genesis_Common::$version;
+
+		wp_register_script( 'displayfeaturedimage-upload', plugins_url( '/includes/js/settings-upload.js', dirname( __FILE__ ) ), array( 'jquery', 'media-upload', 'thickbox' ), $version );
 
 		if ( 'appearance_page_displayfeaturedimagegenesis' === get_current_screen()->id ) {
 			wp_enqueue_media();
