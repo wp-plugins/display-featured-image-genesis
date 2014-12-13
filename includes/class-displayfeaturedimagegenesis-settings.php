@@ -70,7 +70,8 @@ class Display_Featured_Image_Genesis_Settings {
 			'less_header'   => 0,
 			'default'       => '',
 			'exclude_front' => 0,
-			'move_excerpts' => 0
+			'move_excerpts' => 0,
+			'feed_image'    => 0
 		);
 
 		$this->displaysetting = get_option( 'displayfeaturedimagegenesis', $defaults );
@@ -110,6 +111,14 @@ class Display_Featured_Image_Genesis_Settings {
 			'displayfeaturedimagegenesis[move_excerpts]',
 			'<label for="displayfeaturedimagegenesis[move_excerpts]">' . __( 'Move Excerpts/Archive Descriptions', 'display-featured-image-genesis' ) . '</label>',
 			array( $this, 'move_excerpts' ),
+			'displayfeaturedimagegenesis',
+			'display_featured_image_section'
+		);
+
+		add_settings_field(
+			'displayfeaturedimagegenesis[feed_image]',
+			'<label for="displayfeaturedimagegenesis[feed_image]">' . __( 'Add Featured Image to Feed?', 'display-featured-image-genesis' ) . '</label>',
+			array( $this, 'add_image_to_feed' ),
 			'displayfeaturedimagegenesis',
 			'display_featured_image_section'
 		);
@@ -190,6 +199,17 @@ class Display_Featured_Image_Genesis_Settings {
 	}
 
 	/**
+	 * option to add images to feed
+	 * @return 0 1 checkbox
+	 *
+	 * @since  1.5.0
+	 */
+	public function add_image_to_feed() {
+		echo '<input type="hidden" name="displayfeaturedimagegenesis[feed_image]" value="0" />';
+		echo '<label for="displayfeaturedimagegenesis[feed_image]"><input type="checkbox" name="displayfeaturedimagegenesis[feed_image]" id="displayfeaturedimagegenesis[feed_image]" value="1"' . checked( 1, esc_attr( $this->displaysetting['feed_image'] ), false ) . ' class="code" />' . __( 'Optionally, add the featured image to your RSS feed.', 'display-featured-image-genesis' ) . '</label>';
+	}
+
+	/**
 	 * validate all inputs
 	 * @param  string $new_value various settings
 	 * @return string            number or URL
@@ -211,6 +231,8 @@ class Display_Featured_Image_Genesis_Settings {
 		$new_value['exclude_front'] = $this->one_zero( $new_value['exclude_front'] );
 
 		$new_value['move_excerpts'] = $this->one_zero( $new_value['move_excerpts'] );
+
+		$new_value['feed_image']    = $this->one_zero( $new_value['feed_image'] );
 
 		return $new_value;
 
@@ -335,6 +357,11 @@ class Display_Featured_Image_Genesis_Settings {
 			'<h3>' . __( 'Move Excerpts/Archive Descriptions', 'display-featured-image-genesis' ) . '</h3>' .
 			'<p>' . __( 'By default, archive descriptions (set on the Genesis Archive Settings pages) show below the Default Featured Image, while the archive title displays on top of the image. If you check this box, all headlines, descriptions, and optional excerpts will display in a box overlaying the Featured Image.', 'display-featured-image-genesis' ) . '</p>';
 
+		$feed_help =
+			'<h3>' . __( 'Add Featured Image to Feed?', 'display-featured-image-genesis' ) . '</h3>' .
+			'<p>' . __( 'This plugin does not add the Featured Image to your content, so normally you will not see your Featured Image in the feed. If you select this option, however, the Featured Image (if it is set) will be added to each entry in your RSS feed.', 'display-featured-image-genesis' ) . '</p>' .
+			'<p>' . __( 'If your RSS feed is set to Full Text, the Featured Image will be added to the entry content. If it is set to Summary, the Featured Image will be added to the excerpt instead.', 'display-featured-image-genesis' ) . '</p>';
+
 
 		$screen->add_help_tab( array(
 			'id'      => 'displayfeaturedimage_less_header-help',
@@ -358,6 +385,12 @@ class Display_Featured_Image_Genesis_Settings {
 			'id'      => 'displayfeaturedimage_excerpts-help',
 			'title'   => __( 'Move Excerpts', 'display-featured-image-genesis' ),
 			'content' => $excerpts_help,
+		) );
+
+		$screen->add_help_tab( array(
+			'id'      => 'displayfeaturedimage_feed-help',
+			'title'   => __( 'RSS Feed', 'display-featured-image-genesis' ),
+			'content' => $feed_help,
 		) );
 
 	}

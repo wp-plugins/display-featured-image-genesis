@@ -11,8 +11,8 @@
  * @wordpress-plugin
  * Plugin Name:       Display Featured Image for Genesis
  * Plugin URI:        http://github.com/robincornett/display-featured-image-genesis/
- * Description:       This plugin requires the Genesis Framework. It varies the display of the post or page featured image, depending on size.
- * Version:           1.4.3
+ * Description:       This plugin requires the Genesis Framework. It intelligently varies the display of the post or page featured image, depending on size.
+ * Version:           1.5.0
  * Author:            Robin Cornett
  * Author URI:        http://robincornett.com
  * License:           GPL-2.0+
@@ -29,18 +29,21 @@ require plugin_dir_path( __FILE__ ) . 'includes/class-displayfeaturedimagegenesi
 require plugin_dir_path( __FILE__ ) . 'includes/class-displayfeaturedimagegenesis-common.php';
 require plugin_dir_path( __FILE__ ) . 'includes/class-displayfeaturedimagegenesis-description.php';
 require plugin_dir_path( __FILE__ ) . 'includes/class-displayfeaturedimagegenesis-output.php';
+require plugin_dir_path( __FILE__ ) . 'includes/class-displayfeaturedimagegenesis-rss.php';
 require plugin_dir_path( __FILE__ ) . 'includes/class-displayfeaturedimagegenesis-settings.php';
 
 // Instantiate dependent classes
 $displayfeaturedimagegenesis_common      = new Display_Featured_Image_Genesis_Common();
 $displayfeaturedimagegenesis_description = new Display_Featured_Image_Genesis_Description();
 $displayfeaturedimagegenesis_output      = new Display_Featured_Image_Genesis_Output();
+$displayfeaturedimagegenesis_rss         = new Display_Featured_Image_Genesis_RSS();
 $displayfeaturedimagegenesis_settings    = new Display_Featured_Image_Genesis_Settings();
 
 $displayfeaturedimage = new Display_Featured_Image_Genesis(
 	$displayfeaturedimagegenesis_common,
 	$displayfeaturedimagegenesis_description,
 	$displayfeaturedimagegenesis_output,
+	$displayfeaturedimagegenesis_rss,
 	$displayfeaturedimagegenesis_settings
 );
 
