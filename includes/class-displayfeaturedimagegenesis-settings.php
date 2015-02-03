@@ -15,6 +15,8 @@ class Display_Featured_Image_Genesis_Settings {
 	 */
 	protected $displaysetting;
 
+	protected $post_types;
+
 	/**
 	 * add a submenu page under Appearance
 	 * @return submenu Display Featured image settings page
@@ -70,6 +72,7 @@ class Display_Featured_Image_Genesis_Settings {
 			'less_header'   => 0,
 			'default'       => '',
 			'exclude_front' => 0,
+			'keep_titles'   => 0,
 			'move_excerpts' => 0,
 			'feed_image'    => 0
 		);
@@ -108,6 +111,14 @@ class Display_Featured_Image_Genesis_Settings {
 		);
 
 		add_settings_field(
+			'displayfeaturedimagegenesis[keep_titles]',
+			'<label for="displayfeaturedimagegenesis[keep_titles]">' . __( 'Do Not Move Titles', 'display-featured-image-genesis' ) . '</label>',
+			array( $this, 'keep_titles' ),
+			'displayfeaturedimagegenesis',
+			'display_featured_image_section'
+		);
+
+		add_settings_field(
 			'displayfeaturedimagegenesis[move_excerpts]',
 			'<label for="displayfeaturedimagegenesis[move_excerpts]">' . __( 'Move Excerpts/Archive Descriptions', 'display-featured-image-genesis' ) . '</label>',
 			array( $this, 'move_excerpts' ),
@@ -123,7 +134,33 @@ class Display_Featured_Image_Genesis_Settings {
 			'display_featured_image_section'
 		);
 
-		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_scripts' ) );
+		$args = array(
+			'public'      => true,
+			'_builtin'    => false,
+			'has_archive' => true,
+		);
+		$output = 'objects';
+
+		$this->post_types = get_post_types( $args, $output );
+
+		if ( $this->post_types ) {
+			add_settings_section(
+				'display_featured_image_custom_post_types',
+				__( 'Featured Images for Custom Post Types', 'display-featured-image-genesis' ),
+				array( $this, 'cpt_section_description' ),
+				'displayfeaturedimagegenesis'
+			);
+
+
+			add_settings_field(
+				"displayfeaturedimagegenesis[post_types]",
+				__( 'Featured Images', 'display-featured-image-genesis' ),
+				array( $this, 'set_cpt_image' ),
+				'displayfeaturedimagegenesis',
+				'display_featured_image_custom_post_types'
+			);
+
+		}
 
 	}
 
@@ -135,6 +172,16 @@ class Display_Featured_Image_Genesis_Settings {
 	 */
 	public function section_description() {
 		echo '<p>' . __( 'The Display Featured Image for Genesis plugin has just a few optional settings. Check the Help tab for more information. ', 'display-featured-image-genesis' ) . '</p>';
+	}
+
+	/**
+	 * Section description
+	 * @return section description
+	 *
+	 * @since 1.1.0
+	 */
+	public function cpt_section_description() {
+		echo '<p>' . __( 'Since you have custom post types with archives, you might like to set a featured image for each of them.', 'display-featured-image-genesis' ) . '</p>';
 	}
 
 	/**
@@ -168,8 +215,8 @@ class Display_Featured_Image_Genesis_Settings {
 			echo '<img src="' . esc_url( $preview[0] ) . '" />';
 			echo '</div>';
 		}
-		echo '<input type="url" id="default_image_url" name="displayfeaturedimagegenesis[default]" value="' . esc_url( $this->displaysetting['default'] ) . '" />';
-		echo '<input id="upload_default_image" type="button" class="upload_default_image button" value="' . __( 'Select Default Image', 'display-featured-image-genesis' ) . '" />';
+		echo '<input type="url" class="upload_image_url" id="displayfeaturedimagegenesis[default]" name="displayfeaturedimagegenesis[default]" value="' . esc_url( $this->displaysetting['default'] ) . '" />';
+		echo '<input type="button" class="upload_default_image button" value="' . __( 'Select Image', 'display-featured-image-genesis' ) . '" />';
 		echo '<p class="description">' . sprintf(
 			__( 'If you would like to use a default image for the featured image, upload it here. Must be at least %1$s pixels wide.', 'display-featured-image-genesis' ),
 			absint( $item->large + 1 )
@@ -185,6 +232,17 @@ class Display_Featured_Image_Genesis_Settings {
 	public function exclude_front() {
 		echo '<input type="hidden" name="displayfeaturedimagegenesis[exclude_front]" value="0" />';
 		echo '<label for="displayfeaturedimagegenesis[exclude_front]"><input type="checkbox" name="displayfeaturedimagegenesis[exclude_front]" id="displayfeaturedimagegenesis[exclude_front]" value="1"' . checked( 1, esc_attr( $this->displaysetting['exclude_front'] ), false ) . ' class="code" />' . __( 'Do not show the Featured Image on the Front Page of the site.', 'display-featured-image-genesis' ) . '</label>';
+	}
+
+	/**
+	 * option to not move titles
+	 * @return 0 1 checkbox
+	 *
+	 * @since  2.0.0
+	 */
+	public function keep_titles() {
+		echo '<input type="hidden" name="displayfeaturedimagegenesis[keep_titles]" value="0" />';
+		echo '<label for="displayfeaturedimagegenesis[keep_titles]"><input type="checkbox" name="displayfeaturedimagegenesis[keep_titles]" id="displayfeaturedimagegenesis[keep_titles]" value="1"' . checked( 1, esc_attr( $this->displaysetting['keep_titles'] ), false ) . ' class="code" />' . __( 'Do not move the titles to overlay the backstretch Featured Image.', 'display-featured-image-genesis' ) . '</label>';
 	}
 
 	/**
@@ -210,6 +268,78 @@ class Display_Featured_Image_Genesis_Settings {
 	}
 
 	/**
+	 * Custom Post Type image uploader
+	 *
+	 * @return  image
+	 *
+	 * @since  2.0.0
+	 */
+	public function set_cpt_image() {
+
+		$item = Display_Featured_Image_Genesis_Common::get_image_variables();
+
+		foreach ( $this->post_types as $post ) {
+
+			$post_type = $post->name;
+			if ( empty( $this->displaysetting['post_type'][$post_type] ) ) {
+				$this->displaysetting['post_type'][$post_type] = '';
+			}
+			echo '<h4>' . $post->label . '</h4>';
+			if ( ! empty( $this->displaysetting['post_type'][$post_type] ) ) {
+				$id      = Display_Featured_Image_Genesis_Common::get_image_id( $this->displaysetting['post_type'][$post_type] );
+				$preview = wp_get_attachment_image_src( $id, 'medium' );
+				echo '<div id="upload_logo_preview">';
+				echo '<img src="' . esc_url( $preview[0] ) . '" />';
+				echo '</div>';
+			}
+			echo '<input type="url" class="upload_image_url" id="displayfeaturedimagegenesis[post_type][' . $post_type . ']" name="displayfeaturedimagegenesis[post_type][' . $post_type . ']" value="' . esc_url( $this->displaysetting['post_type'][$post_type] ) . '" />';
+			echo '<input type="button" class="upload_default_image button" value="' . __( 'Select Image', 'display-featured-image-genesis' ) . '" />';
+			if ( ! empty( $this->displaysetting['post_type'][$post_type] ) ) {
+				echo '<p class="description">' . sprintf(
+					__( 'View your <a href="%1$s" target="_blank">%2$s</a> archive.', 'display-featured-image-genesis' ),
+					esc_url( get_post_type_archive_link( $post_type ) ),
+					$post->label
+				) . '</p>';
+			}
+
+		}
+
+	}
+
+	/**
+	 * Save extra taxonomy fields callback function.
+	 * @param  term id $term_id the id of the term
+	 * @return updated option          updated option for term featured image
+	 *
+	 * @since 2.0.0
+	 */
+	public function save_taxonomy_custom_meta( $term_id ) {
+
+		if ( isset( $_POST['displayfeaturedimagegenesis'] ) ) {
+			$t_id           = $term_id;
+			$displaysetting = get_option( "displayfeaturedimagegenesis_$t_id" );
+			$cat_keys       = array_keys( $_POST['displayfeaturedimagegenesis'] );
+			$is_updated     = false;
+			foreach ( $cat_keys as $key ) {
+				if ( isset ( $_POST['displayfeaturedimagegenesis'][$key] ) ) {
+					$displaysetting[$key] = $_POST['displayfeaturedimagegenesis'][$key];
+					if ( $_POST['displayfeaturedimagegenesis']['term_image'] === $displaysetting[$key] ) {
+						$displaysetting[$key] = $this->validate_taxonomy_image( $_POST['displayfeaturedimagegenesis'][$key] );
+						if ( false !== $displaysetting[$key] ) {
+							$is_updated = true;
+						}
+					}
+				}
+			}
+			//* Save the option array.
+			if ( $is_updated ) {
+				update_option( "displayfeaturedimagegenesis_$t_id", $displaysetting );
+			}
+		}
+
+	}
+
+	/**
 	 * validate all inputs
 	 * @param  string $new_value various settings
 	 * @return string            number or URL
@@ -230,9 +360,18 @@ class Display_Featured_Image_Genesis_Settings {
 
 		$new_value['exclude_front'] = $this->one_zero( $new_value['exclude_front'] );
 
+		$new_value['keep_titles']   = $this->one_zero( $new_value['keep_titles'] );
+
 		$new_value['move_excerpts'] = $this->one_zero( $new_value['move_excerpts'] );
 
 		$new_value['feed_image']    = $this->one_zero( $new_value['feed_image'] );
+
+		foreach ( $this->post_types as $post_type ) {
+			$new_value['post_type'][$post_type->name] = $this->validate_post_type_image( $new_value['post_type'][$post_type->name] );
+			if ( false === $new_value['post_type'][$post_type->name] ) {
+				$new_value['post_type'][$post_type->name] = $this->displaysetting['post_type'][$post_type->name];
+			}
+		}
 
 		return $new_value;
 
@@ -253,11 +392,12 @@ class Display_Featured_Image_Genesis_Settings {
 		$metadata  = wp_get_attachment_metadata( $id );
 		$width     = $metadata['width'];
 
-		// ok for field to be empty
+		//* ok for field to be empty
 		if ( $new_value ) {
 
 			if ( ! $valid ) {
-				$message   = __( 'Sorry, that is an invalid file type. The Default Featured Image has been reset to the last valid setting.', 'display-featured-image-genesis' );
+				$message   = __( 'Sorry, that is an invalid file type.', 'display-featured-image-genesis' );
+				$message  .= __( ' The Default Featured Image has been reset to the last valid setting.', 'display-featured-image-genesis' );
 				$new_value = $this->displaysetting['default'];
 
 				add_settings_error(
@@ -267,9 +407,10 @@ class Display_Featured_Image_Genesis_Settings {
 					'error'
 				);
 			}
-			// if file is an image, but is too small, throw it back
+			//* if file is an image, but is too small, throw it back
 			elseif ( $width <= $large ) {
-				$message   = __( 'Sorry, your image is too small. The Default Featured Image has been reset to the last valid setting.', 'display-featured-image-genesis' );
+				$message   = __( 'Sorry, your image is too small.', 'display-featured-image-genesis' );
+				$message  .= __( ' The Default Featured Image has been reset to the last valid setting.', 'display-featured-image-genesis' );
 				$new_value = $this->displaysetting['default'];
 
 				add_settings_error(
@@ -280,6 +421,76 @@ class Display_Featured_Image_Genesis_Settings {
 				);
 			}
 
+		}
+
+		return $new_value;
+	}
+
+	/**
+	 * Returns empty value for image if not correct file type/size
+	 * @param  string $new_value New value
+	 * @return string            New or previous value, depending on allowed image size.
+	 * @since  2.0.0
+	 */
+	protected function validate_post_type_image( $new_value ) {
+
+		$new_value = esc_url( $new_value );
+		$valid     = $this->is_valid_img_ext( $new_value );
+		$medium    = get_option( 'medium_size_w' );
+		$id        = Display_Featured_Image_Genesis_Common::get_image_id( $new_value );
+		$metadata  = wp_get_attachment_metadata( $id );
+		$width     = $metadata['width'];
+
+		//* ok for field to be empty
+		if ( $new_value ) {
+
+			if ( ! $valid ) {
+				$message   = __( 'Sorry, that is an invalid file type.', 'display-featured-image-genesis' );
+				$new_value = false;
+
+				add_settings_error(
+					$this->displaysetting['post_type'],
+					esc_attr( 'invalid' ),
+					$message,
+					'error'
+				);
+			}
+			//* if file is an image, but is too small, throw it back
+			elseif ( $width <= $medium ) {
+				$message   = __( 'Sorry, your image is too small.', 'display-featured-image-genesis' );
+				$new_value = false;
+
+				add_settings_error(
+					$this->displaysetting['post_type'],
+					esc_attr( 'weetiny' ),
+					$message,
+					'error'
+				);
+			}
+
+		}
+
+		return $new_value;
+	}
+
+	/**
+	 * Returns false value for image if not correct file type/size
+	 * @param  string $new_value New value
+	 * @return string            New value or false, depending on allowed image size.
+	 * @since  2.0.0
+	 */
+	protected function validate_taxonomy_image( $new_value ) {
+
+		$new_value = esc_url( $new_value );
+		$valid     = $this->is_valid_img_ext( $new_value );
+		$medium    = get_option( 'medium_size_w' );
+		$id        = Display_Featured_Image_Genesis_Common::get_image_id( $new_value );
+		$metadata  = wp_get_attachment_metadata( $id );
+		$width     = $metadata['width'];
+
+		// ok for field to be empty
+		if ( $new_value && ( ! $valid || $width <= $medium ) ) {
+			$new_value = false;
 		}
 
 		return $new_value;
@@ -353,6 +564,10 @@ class Display_Featured_Image_Genesis_Settings {
 				esc_url( 'https://github.com/robincornett/display-featured-image-genesis#how-do-i-stop-the-featured-image-action-from-showing-on-my-custom-post-types' )
 			) . '</p>';
 
+		$keeptitles_help =
+			'<h3>' . __( 'Do Not Move Titles', 'display-featured-image-genesis' ) . '</h3>' .
+			'<p>' . __( 'This setting applies to the backstretch Featured Image only. It allows you to keep the post/page titles in their original location, instead of overlaying the new image.', 'display-featured-image-genesis' ) . '</p>';
+
 		$excerpts_help =
 			'<h3>' . __( 'Move Excerpts/Archive Descriptions', 'display-featured-image-genesis' ) . '</h3>' .
 			'<p>' . __( 'By default, archive descriptions (set on the Genesis Archive Settings pages) show below the Default Featured Image, while the archive title displays on top of the image. If you check this box, all headlines, descriptions, and optional excerpts will display in a box overlaying the Featured Image.', 'display-featured-image-genesis' ) . '</p>';
@@ -361,6 +576,12 @@ class Display_Featured_Image_Genesis_Settings {
 			'<h3>' . __( 'Add Featured Image to Feed?', 'display-featured-image-genesis' ) . '</h3>' .
 			'<p>' . __( 'This plugin does not add the Featured Image to your content, so normally you will not see your Featured Image in the feed. If you select this option, however, the Featured Image (if it is set) will be added to each entry in your RSS feed.', 'display-featured-image-genesis' ) . '</p>' .
 			'<p>' . __( 'If your RSS feed is set to Full Text, the Featured Image will be added to the entry content. If it is set to Summary, the Featured Image will be added to the excerpt instead.', 'display-featured-image-genesis' ) . '</p>';
+
+		$cpt_help =
+			'<h3>' . __( 'Featured Images for Custom Post Types', 'display-featured-image-genesis' ) . '</h3>' .
+			'<p>' . __( 'Some plugins and/or developers extend the power of WordPress by using Custom Post Types to create special kinds of content.', 'display-featured-image-genesis' ) . '</p>' .
+			'<p>' . __( 'Since your site uses Custom Post Types, you may optionally set a Featured Image for each archive.', 'display-featured-image-genesis' ) . '</p>' .
+			'<p>' . __( 'Featured Images for archives can be smaller than the Default Featured Image, but still need to be larger than your site\'s "medium" image size.', 'display-featured-image-genesis' ) . '</p>';
 
 
 		$screen->add_help_tab( array(
@@ -382,6 +603,12 @@ class Display_Featured_Image_Genesis_Settings {
 		) );
 
 		$screen->add_help_tab( array(
+			'id'      => 'displayfeaturedimage_keep_titles-help',
+			'title'   => __( 'Do Not Move Titles', 'display-featured-image-genesis' ),
+			'content' => $keeptitles_help,
+		) );
+
+		$screen->add_help_tab( array(
 			'id'      => 'displayfeaturedimage_excerpts-help',
 			'title'   => __( 'Move Excerpts', 'display-featured-image-genesis' ),
 			'content' => $excerpts_help,
@@ -393,24 +620,11 @@ class Display_Featured_Image_Genesis_Settings {
 			'content' => $feed_help,
 		) );
 
-	}
-
-	/**
-	 * enqueue admin scripts
-	 * @return scripts to use image uploader
-	 *
-	 * @since  1.2.1
-	 */
-	public function enqueue_scripts() {
-		$version = Display_Featured_Image_Genesis_Common::$version;
-
-		wp_register_script( 'displayfeaturedimage-upload', plugins_url( '/includes/js/settings-upload.js', dirname( __FILE__ ) ), array( 'jquery', 'media-upload', 'thickbox' ), $version );
-
-		if ( 'appearance_page_displayfeaturedimagegenesis' === get_current_screen()->id ) {
-			wp_enqueue_media();
-			wp_enqueue_script( 'displayfeaturedimage-upload' );
-			wp_localize_script( 'displayfeaturedimage-upload', 'objectL10n', array(
-				'text' => __( 'Choose Image', 'display-featured-image-genesis' ),
+		if ( $this->post_types ) {
+			$screen->add_help_tab( array(
+				'id'      => 'displayfeaturedimage_cpt-help',
+				'title'   => __( 'Custom Post Types', 'display-featured-image-genesis' ),
+				'content' => $cpt_help,
 			) );
 		}
 

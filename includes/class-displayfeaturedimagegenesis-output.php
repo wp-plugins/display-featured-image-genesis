@@ -15,9 +15,19 @@ class Display_Featured_Image_Genesis_Output {
 	 * @since 1.1.3
 	 */
 	public function manage_output() {
+
 		$displaysetting = get_option( 'displayfeaturedimagegenesis' );
-		$fallback       = $displaysetting['default'];
-		if ( is_admin() || ( empty( $fallback ) && ! is_home() && ! is_singular() ) || ( in_array( get_post_type(), Display_Featured_Image_Genesis_Common::get_skipped_posttypes() ) ) ) {
+		$skip           = $displaysetting['exclude_front'];
+
+		$post_types = array();
+		$post_types[] = 'attachment';
+		$post_types[] = 'revision';
+		$post_types[] = 'nav_menu_item';
+		if ( $skip ) $post_types[] = is_front_page();
+
+		$skipped_types = apply_filters( 'display_featured_image_genesis_skipped_posttypes', $post_types );
+
+		if ( is_admin() || ( in_array( get_post_type(), $skipped_types ) ) ) {
 			return;
 		}
 
@@ -39,7 +49,7 @@ class Display_Featured_Image_Genesis_Output {
 		$item    = Display_Featured_Image_Genesis_Common::get_image_variables();
 
 		//* if there is no backstretch image set, or it is too small, die
-		if ( empty( $item->backstretch ) || $item->width <= $item->medium ) {
+		if ( empty( $item->backstretch ) || $item->width <= $item->medium || is_paged() ) {
 			return;
 		}
 		//* if the featured image is not part of the content, or we're not on a singular page, carry on
@@ -64,7 +74,15 @@ class Display_Featured_Image_Genesis_Output {
 
 			//* otherwise it's a large image.
 			elseif ( $item->width <= $item->large ) {
-				add_action( 'genesis_before_loop', array( $this, 'do_large_image' ) ); // works for both HTML5 and XHTML
+
+				remove_action( 'genesis_before_loop', 'genesis_do_cpt_archive_title_description' );
+				add_action( 'genesis_before_loop', 'genesis_do_cpt_archive_title_description', 15 );
+
+				$hook = 'genesis_before_loop';
+				if ( is_singular() && ! is_page_template( 'page_blog.php' ) ) {
+					$hook = apply_filters( 'display_featured_image_genesis_move_large_image', $hook );
+				}
+				add_action( $hook, array( $this, 'do_large_image' ), 12 ); // works for both HTML5 and XHTML
 			}
 		}
 	}
@@ -95,32 +113,42 @@ class Display_Featured_Image_Genesis_Output {
 	}
 
 	/**
-	 * backstretch image title (for images which are larger than Media Settings > Large )
+	 * backstretch image title ( for images which are larger than Media Settings > Large )
 	 * @return image
 	 *
 	 * @since  1.0.0
 	 */
 	public function do_backstretch_image_title() {
 
-		$item = Display_Featured_Image_Genesis_Common::get_image_variables();
+		$item           = Display_Featured_Image_Genesis_Common::get_image_variables();
+		$displaysetting = get_option( 'displayfeaturedimagegenesis' );
+		$keep_titles    = $displaysetting['keep_titles'];
 
-		if ( is_singular() && ! is_front_page() && ! is_page_template( 'page_blog.php' ) ) {
-			remove_action( 'genesis_entry_header', 'genesis_do_post_title' ); // HTML5
-			remove_action( 'genesis_post_title', 'genesis_do_post_title' ); // XHTML
+		if ( ! $keep_titles ) {
+			if ( is_singular() && ! is_front_page() && ! is_page_template( 'page_blog.php' ) ) {
+				remove_action( 'genesis_entry_header', 'genesis_do_post_title' ); // HTML5
+				remove_action( 'genesis_post_title', 'genesis_do_post_title' ); // XHTML
+			}
+
+			remove_action( 'genesis_before_loop', 'genesis_do_taxonomy_title_description', 15 );
+			remove_action( 'genesis_before_loop', 'genesis_do_author_title_description', 15 );
+			remove_action( 'genesis_before_loop', 'genesis_do_cpt_archive_title_description' );
 		}
-
-		remove_action( 'genesis_before_loop', 'genesis_do_taxonomy_title_description', 15 );
-		remove_action( 'genesis_before_loop', 'genesis_do_author_title_description', 15 );
-		remove_action( 'genesis_before_loop', 'genesis_do_cpt_archive_title_description' );
 
 		echo '<div class="big-leader">';
 		echo '<div class="wrap">';
 
-		$displaysetting = get_option( 'displayfeaturedimagegenesis' );
-		$move_excerpts  = $displaysetting['move_excerpts'];
+		$move_excerpts = $displaysetting['move_excerpts'];
+		$post_types    = array();
+		/**
+		 * create a filter to not move excerpts if move excerpts is enabled
+		 * @var filter
+		 * @since  2.0.0 (deprecated old function from 1.3.3)
+		 */
+		$omit_excerpt  = apply_filters( 'display_featured_image_genesis_omit_excerpt', $post_types );
 
 		//* if move excerpts is enabled
-		if ( $move_excerpts && ! in_array( get_post_type(), Display_Featured_Image_Genesis_Common::omit_excerpt() ) ) {
+		if ( $move_excerpts && ! in_array( get_post_type(), $omit_excerpt ) ) {
 
 			Display_Featured_Image_Genesis_Description::do_front_blog_excerpt();
 			Display_Featured_Image_Genesis_Description::do_excerpt();
@@ -130,10 +158,10 @@ class Display_Featured_Image_Genesis_Output {
 
 		}
 
-		else {
+		elseif ( ! $keep_titles ) {
 
 			if ( ! empty( $item->title ) && ! is_front_page() ) {
-				echo '<h1 class="entry-title featured-image-overlay">' . esc_attr( $item->title ) . '</h1>';
+				echo '<h1 class="entry-title featured-image-overlay">' . $item->title . '</h1>';
 			}
 
 			remove_action( 'genesis_before_loop', 'genesis_do_cpt_archive_title_description' );
@@ -148,7 +176,7 @@ class Display_Featured_Image_Genesis_Output {
 		echo '</div>';
 
 		//* if javascript not enabled, do a fallback background image
-		$no_js  = '<noscript><div class="backstretch no-js" style="background-image: url(' . $item->backstretch[0] . '); }"></div></noscript>';
+		$no_js  = '<noscript><div class="backstretch no-js" style="background-image: url(' . esc_url( $item->backstretch[0] ) . '); }"></div></noscript>';
 		echo $no_js;
 
 		//* close big-leader
@@ -165,7 +193,7 @@ class Display_Featured_Image_Genesis_Output {
 		$item  = Display_Featured_Image_Genesis_Common::get_image_variables();
 		$image = sprintf( '<img src="%1$s" class="aligncenter featured" alt="%2$s" title="%2$s" />',
 			esc_url( $item->backstretch[0] ),
-			esc_attr( $item->title )
+			$item->title
 		);
 
 		echo $image;

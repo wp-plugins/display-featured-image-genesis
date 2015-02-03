@@ -16,12 +16,14 @@
  */
 class Display_Featured_Image_Genesis {
 
-	function __construct( $common, $description, $output, $rss, $settings ) {
-		$this->common   = $common;
-		$this->archive  = $description;
-		$this->output   = $output;
-		$this->rss      = $rss;
-		$this->settings = $settings;
+	function __construct( $admin, $common, $description, $output, $rss, $settings, $taxonomies ) {
+		$this->admin      = $admin;
+		$this->common     = $common;
+		$this->archive    = $description;
+		$this->output     = $output;
+		$this->rss        = $rss;
+		$this->settings   = $settings;
+		$this->taxonomies = $taxonomies;
 	}
 
 	public function run() {
@@ -33,10 +35,14 @@ class Display_Featured_Image_Genesis {
 
 		add_action( 'init', array( $this, 'add_plugin_supports' ) );
 		add_action( 'admin_init', array( $this, 'check_settings' ) );
+		add_action( 'admin_init', array( $this, 'set_taxonomy_meta' ) );
+		add_action( 'widgets_init', array( $this, 'register_widgets' ) );
+		add_action( 'admin_init', array( $this->admin, 'set_up_columns' ) );
 		add_action( 'plugins_loaded', array( $this, 'load_textdomain' ) );
 		add_action( 'admin_menu', array( $this->settings, 'do_submenu_page' ) );
 		add_action( 'get_header', array( $this->output, 'manage_output' ) );
 		add_action( 'template_redirect', array( $this->rss, 'maybe_do_feed' ) );
+		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_scripts' ) );
 
 	}
 
@@ -115,6 +121,13 @@ class Display_Featured_Image_Genesis {
 			) );
 		}
 
+		//* new setting for titles added in 2.0.0
+		if ( empty( $displaysetting['keep_titles'] ) ) {
+			$this->update_settings( array(
+				'keep_titles' => 0
+			) );
+		}
+
 	}
 
 	/**
@@ -130,12 +143,71 @@ class Display_Featured_Image_Genesis {
 	}
 
 	/**
+	 * set up all actions for adding featured images to taxonomies
+	 * @since  2.0.0
+	 */
+	public function set_taxonomy_meta() {
+		$args       = array(
+			'public' => true
+		);
+		$output     = 'names';
+		$taxonomies = get_taxonomies( $args, $output );
+		foreach ( $taxonomies as $taxonomy ) {
+			add_action( "{$taxonomy}_add_form_fields", array( $this->taxonomies, 'add_taxonomy_meta_fields' ), 5, 2 );
+			add_action( "{$taxonomy}_edit_form_fields", array( $this->taxonomies, 'edit_taxonomy_meta_fields' ), 5, 2 );
+			add_action( "edited_{$taxonomy}", array( $this->settings, 'save_taxonomy_custom_meta' ), 10, 2 );
+			add_action( "create_{$taxonomy}", array( $this->settings, 'save_taxonomy_custom_meta' ), 10, 2 );
+			add_action( 'load-edit-tags.php', array( $this->taxonomies, 'help' ) );
+		}
+	}
+
+	/**
 	 * Set up text domain for translations
 	 *
 	 * @since 1.1.0
 	 */
 	public function load_textdomain() {
 		load_plugin_textdomain( 'display-featured-image-genesis', false, dirname( plugin_basename( __FILE__ ) ) . '/languages/' );
+	}
+
+	/**
+	 * enqueue admin scripts
+	 * @return scripts to use image uploader
+	 *
+	 * @since  1.2.1
+	 */
+	public function enqueue_scripts() {
+
+		$version = Display_Featured_Image_Genesis_Common::$version;
+		$check   = strpos( get_current_screen()->id, 'displayfeaturedimagegenesis' );
+
+		wp_register_script( 'displayfeaturedimage-upload', plugins_url( '/includes/js/settings-upload.js', dirname( __FILE__ ) ), array( 'jquery', 'media-upload', 'thickbox' ), $version );
+		wp_register_script( 'widget_selector', plugins_url( '/includes/js/widget-selector.js', dirname( __FILE__ ) ), array( 'jquery' ), $version );
+
+		$screen = get_current_screen();
+
+		if ( 'appearance_page_displayfeaturedimagegenesis' === $screen->id || ! empty( $screen->taxonomy ) ) {
+			wp_enqueue_media();
+			wp_enqueue_script( 'displayfeaturedimage-upload' );
+			wp_localize_script( 'displayfeaturedimage-upload', 'objectL10n', array(
+				'text' => __( 'Select Image', 'display-featured-image-genesis' ),
+			) );
+		}
+
+		if ( in_array( $screen->id, array( 'widgets', 'customize' ) ) ) {
+			wp_enqueue_script( 'widget_selector' );
+			wp_localize_script( 'widget_selector', 'displayfeaturedimagegenesis_ajax_object', array( 'ajax_url' => admin_url( 'admin-ajax.php' ) ) );
+		}
+
+	}
+
+	function register_widgets() {
+
+		require plugin_dir_path( __FILE__ ) . 'widgets/displayfeaturedimagegenesis-cpt-archive-widget.php';
+		require plugin_dir_path( __FILE__ ) . 'widgets/displayfeaturedimagegenesis-taxonomy-widget.php';
+
+		register_widget( 'Display_Featured_Image_Genesis_Widget_Taxonomy' );
+		register_widget( 'Display_Featured_Image_Genesis_Widget_CPT' );
 	}
 
 }

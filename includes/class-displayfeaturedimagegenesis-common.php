@@ -13,7 +13,9 @@ class Display_Featured_Image_Genesis_Common {
 	 * @var string
 	 * @since  1.4.3
 	 */
-	public static $version = '1.5.0';
+	public static $version = '2.0.0';
+
+	protected static $post_types;
 
 	/**
 	 * set and retreive variables for the featured image.
@@ -23,8 +25,9 @@ class Display_Featured_Image_Genesis_Common {
 	 */
 	public static function get_image_variables() {
 
+		self::$post_types = array();
+
 		$item = new stdClass();
-		global $post;
 
 		// variables internal to this function
 		$frontpage       = get_option( 'show_on_front' ); // either 'posts' or 'page'
@@ -34,7 +37,7 @@ class Display_Featured_Image_Genesis_Common {
 		$postspage_image = get_post_thumbnail_id( $postspage );
 
 		if ( is_singular() ) { // just checking for handling conditional variables set by width
-			$thumb_metadata = wp_get_attachment_metadata( get_post_thumbnail_id( $post->ID ) ); // needed only for the next line
+			$thumb_metadata = wp_get_attachment_metadata( get_post_thumbnail_id( get_the_ID() ) ); // needed only for the next line
 			$width = '';
 			if ( $thumb_metadata ) {
 				$width = $thumb_metadata['width'];
@@ -42,6 +45,7 @@ class Display_Featured_Image_Genesis_Common {
 		}
 
 		// sitewide variables used outside this function
+		$item->backstretch = '';
 		$item->fallback    = esc_attr( $displaysetting['default'] ); // url only
 		$item->fallback_id = self::get_image_id( $item->fallback ); // gets image id with attached metadata
 		$item->large       = absint( get_option( 'large_size_w' ) );
@@ -51,21 +55,65 @@ class Display_Featured_Image_Genesis_Common {
 		// Set Featured Image source ID
 		$image_id = ''; // blank if nothing else
 
+		/**
+		 * create a filter to use the fallback image
+		 * @var filter
+		 * @since  2.0.0 (deprecated old use_fallback_image function from 1.2.2)
+		 */
+		$use_fallback = apply_filters( 'display_featured_image_genesis_use_default', self::$post_types );
+
 		// set here with fallback preemptively, if it exists
 		if ( ! empty( $item->fallback ) ) {
 			$image_id = $item->fallback_id;
 		}
 
+		$object = get_queried_object();
 		// if it's a home page with a static front page, and there is a featured image set on the home page
 		if ( is_home() && 'page' === $frontpage && ! empty( $postspage_image ) ) {
 			$image_id = $postspage_image;
 		}
-		// any singular post/page/CPT with either a post_thumbnail larger than medium size OR there is no $item->fallback
-		elseif ( is_singular() && ( $width > $item->medium || empty( $item->fallback ) ) && ! in_array( get_post_type(), self::use_fallback_image() ) ) {
-			$image_id = get_post_thumbnail_id( $post->ID );
+
+		elseif ( is_post_type_archive() ) {
+			$post_type = $object->name;
+			if ( ! empty( $displaysetting['post_type'][$post_type] ) ) {
+				$image_id = self::get_image_id( $displaysetting['post_type'][$post_type] );
+			}
 		}
-		//now actually set the backstretch image source, which includes some metadata
-		$metadata = wp_get_attachment_metadata( $image_id );
+		// taxonomy
+		elseif ( is_category() || is_tag() || is_tax() ) {
+			$t_id      = $object->term_id;
+			$term_meta = get_option( "displayfeaturedimagegenesis_$t_id" );
+			if ( $term_meta ) {
+				$image_id = self::get_image_id( $term_meta['term_image'] );
+			}
+		}
+		// any singular post/page/CPT or there is no $item->fallback
+		elseif ( is_singular() && ! in_array( get_post_type(), $use_fallback ) ) {
+			/**
+			 * create filter to use taxonomy image if single post doesn't have a thumbnail, but one of its terms does.
+			 * @var filter
+			 */
+			$use_tax_image = apply_filters( 'display_featured_image_genesis_use_taxonomy', self::$post_types );
+
+			if ( has_post_thumbnail() && $width > $item->medium ) {
+				$image_id = get_post_thumbnail_id( get_the_ID() );
+			}
+
+			elseif ( ! has_post_thumbnail() || in_array( get_post_type(), $use_tax_image ) ) {
+				$taxonomies = get_taxonomies();
+				$args       = array( 'orderby' => 'count', 'order' => 'DESC' );
+				$terms      = wp_get_object_terms( get_the_ID(), $taxonomies, $args );
+
+				foreach ( $terms as $term ) {
+					$t_id      = $term->term_id;
+					$term_meta = get_option( "displayfeaturedimagegenesis_$t_id" );
+					if ( $term_meta['term_image'] ) {
+						$image_id = self::get_image_id( $term_meta['term_image'] );
+						break;
+					}
+				}
+			}
+		}
 
 		// turn Photon off so we can get the correct image
 		$photon_removed = '';
@@ -73,10 +121,22 @@ class Display_Featured_Image_Genesis_Common {
 			$photon_removed = remove_filter( 'image_downsize', array( Jetpack_Photon::instance(), 'filter_image_downsize' ) );
 		}
 
-		$item->backstretch = wp_get_attachment_image_src( $image_id, 'displayfeaturedimage_backstretch' );
+		/**
+		 * create a filter for user to optionally force post types to use the large image instead of backstretch
+		 * @var filter
+		 *
+		 * @since  2.0.0
+		 */
+		$use_large_image = apply_filters( 'display_featured_image_genesis_use_large_image', self::$post_types );
+		$image_size      = 'displayfeaturedimage_backstretch';
+		if ( in_array( get_post_type(), $use_large_image ) ) {
+			$image_size = 'large';
+		}
+		$item->backstretch = wp_get_attachment_image_src( $image_id, $image_size );
+
 		$item->width = '';
 		if ( ! empty( $item->backstretch ) ) {
-			$item->width = $metadata['width'];
+			$item->width = $item->backstretch[1];
 		}
 
 		// set a content variable so backstretch doesn't show if full size image exists in post.
@@ -84,10 +144,11 @@ class Display_Featured_Image_Genesis_Common {
 		// declare this last so that $item->backstretch is set.
 		if ( ! is_admin() && is_singular() ) {
 			$fullsize      = wp_get_attachment_image_src( $image_id, 'original' );
+			$post          = get_post();
 			$item->content = strpos( $post->post_content, 'src="' . $fullsize[0] );
 			// reset backstretch image source to fallback if it exists and the featured image is being used in content.
 			if ( ! empty( $item->fallback ) && false !== $item->content ) {
-				$item->backstretch = wp_get_attachment_image_src( $item->fallback_id, 'displayfeaturedimage_backstretch' );
+				$item->backstretch = wp_get_attachment_image_src( $item->fallback_id, $image_size );
 				$item->content     = strpos( $post->post_content, 'src="' . $item->backstretch[0] );
 			}
 		}
@@ -163,62 +224,6 @@ class Display_Featured_Image_Genesis_Common {
 		}
 
 		return $attachment_id;
-	}
-
-
-	/**
-	 * skip certain post types
-	 * @return filter creates a new filter for themes/plugins to use to skip certain post types
-	 *
-	 * @since 1.0.1
-	 */
-	public static function get_skipped_posttypes() {
-
-		$displaysetting = get_option( 'displayfeaturedimagegenesis' );
-		$skip = $displaysetting['exclude_front'];
-
-		$post_types   = array();
-		$post_types[] = 'attachment';
-		$post_types[] = 'revision';
-		$post_types[] = 'nav_menu_item';
-		if ( $skip ) $post_types[] = is_front_page();
-
-		return apply_filters( 'display_featured_image_genesis_skipped_posttypes', $post_types );
-
-	}
-
-	/**
-	 * use fallback image as backstretch
-	 * @return filter creates a new filter for themes/plugins to use to use the fallback image even if a large featured image is in place
-	 *
-	 * @since 1.2.0
-	 */
-	public static function use_fallback_image() {
-
-		$post_types   = array();
-		$post_types[] = 'attachment';
-		$post_types[] = 'revision';
-		$post_types[] = 'nav_menu_item';
-
-		return apply_filters( 'display_featured_image_genesis_use_default', $post_types );
-
-	}
-
-	/**
-	 * don't show excerpts even if they exist.
-	 * @return filter creates a new filter for themes/plugins to omit the excerpt on a post type even if an excerpt exists.
-	 *
-	 * @since 1.3.0
-	 */
-	public static function omit_excerpt() {
-
-		$post_types   = array();
-		$post_types[] = 'attachment';
-		$post_types[] = 'revision';
-		$post_types[] = 'nav_menu_item';
-
-		return apply_filters( 'display_featured_image_genesis_omit_excerpt', $post_types );
-
 	}
 
 }
