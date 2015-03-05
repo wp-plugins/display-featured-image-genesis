@@ -53,7 +53,7 @@ class Display_Featured_Image_Genesis_Admin {
 		$post_types['page'] = 'page';
 		foreach ( $post_types as $post_type ) {
 			if ( post_type_supports( $post_type, 'thumbnail' ) ) {
-				add_filter( "manage_{$post_type}_posts_columns", array( $this, 'add_column' ) );
+				add_filter( "manage_edit-{$post_type}_columns", array( $this, 'add_column' ) );
 				add_action( "manage_{$post_type}_posts_custom_column", array( $this, 'custom_post_columns' ), 10, 2 );
 			}
 		}
@@ -87,13 +87,14 @@ class Display_Featured_Image_Genesis_Admin {
 	 */
 	public function manage_taxonomy_column( $value, $column, $term_id ) {
 
-		$t_id = $term_id;
+		$taxonomy = get_current_screen()->taxonomy;
 		if ( 'featured_image' === $column ) {
-			$term_meta = get_option( "displayfeaturedimagegenesis_$t_id" );
+			$term_meta = get_option( "displayfeaturedimagegenesis_$term_id" );
 			if ( ! empty( $term_meta['term_image'] ) ) {
-				$id      = Display_Featured_Image_Genesis_Common::get_image_id( $term_meta['term_image'] );
-				$preview = wp_get_attachment_image_src( $id, 'thumbnail' );
-				echo '<img src="' . $preview[0] . '" width="60" />';
+				$alt_tag = get_term( $term_id, $taxonomy )->name;
+                $id      = Display_Featured_Image_Genesis_Common::get_image_id( $term_meta['term_image'] );
+                $preview = apply_filters( 'display_featured_image_genesis_admin_term_thumbnail', wp_get_attachment_image_src( $id, 'thumbnail' ), $id );
+				echo '<img src="' . $preview[0] . '" alt="' . $alt_tag . '" />';
 			}
 		}
 
@@ -110,9 +111,10 @@ class Display_Featured_Image_Genesis_Admin {
 	public function custom_post_columns( $column, $post_id ) {
 
 		if ( 'featured_image' === $column ) {
-			$image = get_the_post_thumbnail( $post_id, array( 65,65 ) );
-			if ( $image ) {
-				echo $image;
+			$id      = get_post_thumbnail_id( $post_id );
+			$preview = apply_filters( 'display_featured_image_genesis_admin_post_thumbnail', wp_get_attachment_image_src( $id, 'thumbnail' ), $id );
+			if ( $id ) {
+				echo '<img src="' . $preview[0] . '" alt="' . the_title_attribute( 'echo=0' ) . '" />';
 			}
 		}
 
@@ -126,8 +128,8 @@ class Display_Featured_Image_Genesis_Admin {
 		$screen = get_current_screen();
 		if ( in_array( $screen->base, array( 'edit', 'edit-tags' ) ) ) { ?>
 			<style type="text/css">
-				.column-featured_image { width:105px; }
-				.column-featured_image img { margin: 0 auto; display: block; }
+				.column-featured_image { width: 105px; }
+				.column-featured_image img { margin: 0 auto; display: block; height: auto; width: auto; max-width: 60px; max-height: 80px; }
 			</style> <?php
 		}
 	}

@@ -5,7 +5,7 @@ Donate link: https://robincornett.com/donate/
 Tags: backstretch, featured image, featured images, genesis, studiopress, post thumbnails, featured image rss, rss
 Requires at least: 3.8
 Tested up to: 4.1
-Stable tag: 2.0.0
+Stable tag: 2.1.0
 License: GPL-2.0+
 License URI: http://www.gnu.org/licenses/gpl-2.0.txt
 
@@ -109,7 +109,7 @@ If a post has no featured image of its own, and is assigned to multiple taxonomy
 
 It seems that you can also include [conditional tags](http://codex.wordpress.org/Conditional_Tags) in the above, eg `$post_types[] = is_post_type_archive();`.
 
-### The backstretch image takes up too much room on the screen.
+= The backstretch image takes up too much room on the screen. =
 
 If you do not want the height of the backstretch image to be quite the height of the user's browser window, which is the standard, you can reduce it by just a hair. Go to Appearance > Display Featured Image Settings and change the 'Height' number from the default of 0. The higher this number is, the shorter the window will be calculated to be. Feel free to experiment, as no images are harmed by changing this number.
 
@@ -129,7 +129,7 @@ If you need to control the size of the backstretch Featured Image output with mo
 
 	}
 
-### My (large) Featured Image is above my post/page title, and I want it to show below it instead.
+= My (large) Featured Image is above my post/page title, and I want it to show below it instead. =
 
 There is a filter for this, too. By default, the large (as opposed to backstretch) image is added before the Genesis loop, which places it above your post or page title. You can add this filter to your theme's functions.php file to move the image below your post/page title:
 
@@ -141,15 +141,33 @@ There is a filter for this, too. By default, the large (as opposed to backstretc
 
 _Note:_ because the entry header applies to all posts on a page, such as a blog or archive page, this filter modifies the output only on singular posts.
 
+= If a post does not have a featured image of its own, can the term, post type, or default featured image show in the archives? =
+
+Yes! A helper function exists for this, but only runs if you add it. You can easily do this by adding the following to your theme's functions.php file:
+
+	if ( class_exists( 'Display_Featured_Image_Genesis' ) ) {
+		add_action( 'genesis_entry_content', 'display_featured_image_genesis_add_archive_thumbnails', 5 );
+	}
+
+This will follow the settings you choose in the Genesis Theme Settings.
+
 == Screenshots ==
 1. Screenshot of a page using the Backstretch Featured Image
 2. Set a Default Featured Image on the Appearance > Display Featured Image Settings page.
+3. Quickly see the featured image assigned to each post or term.
 
 == Upgrade Notice ==
-= 2.0.0 =
-New feature! Add featured images to taxonomy terms and custom post type archives!
+= 2.1.0 =
+Improvements to term/custom post type images. Also added some nice helper functions.
 
 == Changelog ==
+
+= 2.1.0 =
+* added helper functions for term/custom post type images
+* added HTML5 headline support
+* added lots of filters: for large image output, descriptions, titles, body classes, backstretch image settings
+* fixed image assignment process to correctly handle term, post type featured images as intermediate fallback images
+* bugfix: corrected output if term image has been deleted
 
 = 2.0.0 =
 * added featured images to taxonomy terms!

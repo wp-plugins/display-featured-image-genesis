@@ -13,7 +13,7 @@ class Display_Featured_Image_Genesis_Common {
 	 * @var string
 	 * @since  1.4.3
 	 */
-	public static $version = '2.0.0';
+	public static $version = '2.1.0';
 
 	protected static $post_types;
 
@@ -35,6 +35,8 @@ class Display_Featured_Image_Genesis_Common {
 		$displaysetting  = get_option( 'displayfeaturedimagegenesis' );
 		$move_excerpts   = $displaysetting['move_excerpts'];
 		$postspage_image = get_post_thumbnail_id( $postspage );
+		$fallback        = esc_attr( $displaysetting['default'] ); // url only
+		$medium          = absint( get_option( 'medium_size_w' ) );
 
 		if ( is_singular() ) { // just checking for handling conditional variables set by width
 			$thumb_metadata = wp_get_attachment_metadata( get_post_thumbnail_id( get_the_ID() ) ); // needed only for the next line
@@ -46,11 +48,7 @@ class Display_Featured_Image_Genesis_Common {
 
 		// sitewide variables used outside this function
 		$item->backstretch = '';
-		$item->fallback    = esc_attr( $displaysetting['default'] ); // url only
-		$item->fallback_id = self::get_image_id( $item->fallback ); // gets image id with attached metadata
-		$item->large       = absint( get_option( 'large_size_w' ) );
-		$item->medium      = absint( get_option( 'medium_size_w' ) );
-		$item->reduce      = absint( $displaysetting['less_header'] );
+		$item->fallback_id = self::get_image_id( $fallback ); // gets image id with attached metadata
 
 		// Set Featured Image source ID
 		$image_id = ''; // blank if nothing else
@@ -63,31 +61,43 @@ class Display_Featured_Image_Genesis_Common {
 		$use_fallback = apply_filters( 'display_featured_image_genesis_use_default', self::$post_types );
 
 		// set here with fallback preemptively, if it exists
-		if ( ! empty( $item->fallback ) ) {
+		if ( ! empty( $fallback ) ) {
 			$image_id = $item->fallback_id;
 		}
 
-		$object = get_queried_object();
-		// if it's a home page with a static front page, and there is a featured image set on the home page
+		// outlier: if it's a home page with a static front page, and there is a featured image set on the home page
 		if ( is_home() && 'page' === $frontpage && ! empty( $postspage_image ) ) {
 			$image_id = $postspage_image;
 		}
 
-		elseif ( is_post_type_archive() ) {
-			$post_type = $object->name;
+		$object = get_queried_object();
+		// cpt
+		if ( $object && is_main_query() && ! is_admin() ) {
+			$post_type = '';
+			if ( $object->name ) { // results in post type on cpt archive
+				$post_type = $object->name;
+			}
+			elseif ( $object->taxonomy ) { // on a tax/term/category
+				$tax_object = get_taxonomy( $object->taxonomy );
+				$post_type  = $tax_object->object_type[0];
+			}
+			elseif ( $object->post_type ) { // on singular
+				$post_type = $object->post_type;
+			}
 			if ( ! empty( $displaysetting['post_type'][$post_type] ) ) {
 				$image_id = self::get_image_id( $displaysetting['post_type'][$post_type] );
 			}
 		}
 		// taxonomy
-		elseif ( is_category() || is_tag() || is_tax() ) {
+		if ( is_category() || is_tag() || is_tax() ) {
 			$t_id      = $object->term_id;
 			$term_meta = get_option( "displayfeaturedimagegenesis_$t_id" );
-			if ( $term_meta ) {
+			// if there is a term image
+			if ( ! empty( $term_meta['term_image'] ) ) {
 				$image_id = self::get_image_id( $term_meta['term_image'] );
 			}
 		}
-		// any singular post/page/CPT or there is no $item->fallback
+		// any singular post/page/CPT or there is no $fallback
 		elseif ( is_singular() && ! in_array( get_post_type(), $use_fallback ) ) {
 			/**
 			 * create filter to use taxonomy image if single post doesn't have a thumbnail, but one of its terms does.
@@ -95,22 +105,14 @@ class Display_Featured_Image_Genesis_Common {
 			 */
 			$use_tax_image = apply_filters( 'display_featured_image_genesis_use_taxonomy', self::$post_types );
 
-			if ( has_post_thumbnail() && $width > $item->medium ) {
+			if ( has_post_thumbnail() && $width > $medium ) {
 				$image_id = get_post_thumbnail_id( get_the_ID() );
 			}
 
 			elseif ( ! has_post_thumbnail() || in_array( get_post_type(), $use_tax_image ) ) {
-				$taxonomies = get_taxonomies();
-				$args       = array( 'orderby' => 'count', 'order' => 'DESC' );
-				$terms      = wp_get_object_terms( get_the_ID(), $taxonomies, $args );
-
-				foreach ( $terms as $term ) {
-					$t_id      = $term->term_id;
-					$term_meta = get_option( "displayfeaturedimagegenesis_$t_id" );
-					if ( $term_meta['term_image'] ) {
-						$image_id = self::get_image_id( $term_meta['term_image'] );
-						break;
-					}
+				$term_image_id = display_featured_image_genesis_get_term_image_id();
+				if ( ! empty( $term_image_id ) ) {
+					$image_id = $term_image_id;
 				}
 			}
 		}
@@ -134,11 +136,6 @@ class Display_Featured_Image_Genesis_Common {
 		}
 		$item->backstretch = wp_get_attachment_image_src( $image_id, $image_size );
 
-		$item->width = '';
-		if ( ! empty( $item->backstretch ) ) {
-			$item->width = $item->backstretch[1];
-		}
-
 		// set a content variable so backstretch doesn't show if full size image exists in post.
 		$item->content = '';
 		// declare this last so that $item->backstretch is set.
@@ -146,10 +143,19 @@ class Display_Featured_Image_Genesis_Common {
 			$fullsize      = wp_get_attachment_image_src( $image_id, 'original' );
 			$post          = get_post();
 			$item->content = strpos( $post->post_content, 'src="' . $fullsize[0] );
-			// reset backstretch image source to fallback if it exists and the featured image is being used in content.
-			if ( ! empty( $item->fallback ) && false !== $item->content ) {
-				$item->backstretch = wp_get_attachment_image_src( $item->fallback_id, $image_size );
-				$item->content     = strpos( $post->post_content, 'src="' . $item->backstretch[0] );
+
+			if ( false !== $item->content ) {
+				$term_image = display_featured_image_genesis_get_term_image_id();
+				// reset backstretch image source to term image if it exists and the featured image is being used in content.
+				if ( ! empty( $term_image ) ) {
+					$item->backstretch = wp_get_attachment_image_src( $term_image, $image_size );
+					$item->content     = strpos( $post->post_content, 'src="' . $item->backstretch[0] );
+				}
+				// else, reset backstretch image source to fallback.
+				elseif ( ! empty( $item->fallback ) ) {
+					$item->backstretch = wp_get_attachment_image_src( $item->fallback_id, $image_size );
+					$item->content     = strpos( $post->post_content, 'src="' . $item->backstretch[0] );
+				}
 			}
 		}
 
@@ -159,40 +165,32 @@ class Display_Featured_Image_Genesis_Common {
 		}
 
 		// Set Post/Page Title
-		$item->title = $item->description = '';
+		$title = '';
 
 		if ( is_singular() ) {
-			$item->title = get_the_title();
-			if ( has_excerpt() ) {
-				$item->description = get_the_excerpt();
-			}
+			$title = get_the_title();
 		}
 		elseif ( is_home() && 'page' === $frontpage ) {
-			$item->title       = get_post( $postspage )->post_title;
-			$item->description = get_post( $postspage )->post_excerpt;
+			$title = get_post( $postspage )->post_title;
 		}
 		elseif ( is_category() || is_tag() || is_tax() ) {
 			$term = is_tax() ? get_term_by( 'slug', get_query_var( 'term' ), get_query_var( 'taxonomy' ) ) : get_queried_object();
 			if ( ! $term || ! isset( $term->meta ) ) {
 				return;
 			}
-			$item->title       = $term->meta['headline'];
-			$item->description = $term->meta['intro_text'];
-
+			$title = $term->meta['headline'];
 		}
 		elseif ( is_author() ) {
-			$item->title       = get_the_author_meta( 'headline', (int) get_query_var( 'author' ) );
-			$item->description = get_the_author_meta( 'intro_text', (int) get_query_var( 'author' ) );
+			$title = get_the_author_meta( 'headline', (int) get_query_var( 'author' ) );
 		}
-		elseif ( is_post_type_archive() && genesis_has_post_type_archive_support() && ! empty( $item->fallback ) ) {
-			$item->title       = genesis_get_cpt_option( 'headline' );
-			$item->description = genesis_get_cpt_option( 'intro_text' );
+		elseif ( is_post_type_archive() && genesis_has_post_type_archive_support() ) {
+			$title = genesis_get_cpt_option( 'headline' );
 		}
+		$item->title = apply_filters( 'display_featured_image_genesis_title', $title );
 
 		return $item;
 
 	}
-
 
 	/**
 	 * Get the ID of each image dynamically.

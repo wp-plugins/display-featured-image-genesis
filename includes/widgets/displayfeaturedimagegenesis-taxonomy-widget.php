@@ -33,14 +33,14 @@ class Display_Featured_Image_Genesis_Widget_Taxonomy extends WP_Widget {
 	function __construct() {
 
 		$this->defaults = array(
-			'title'                   => '',
-			'taxonomy'                => 'category',
-			'term'                    => 'none',
-			'show_image'              => 0,
-			'image_alignment'         => '',
-			'image_size'              => 'medium',
-			'show_title'              => 0,
-			'show_content'            => 0
+			'title'           => '',
+			'taxonomy'        => 'category',
+			'term'            => 'none',
+			'show_image'      => 0,
+			'image_alignment' => '',
+			'image_size'      => 'medium',
+			'show_title'      => 0,
+			'show_content'    => 0
 		);
 
 		$widget_ops = array(
@@ -89,6 +89,7 @@ class Display_Featured_Image_Genesis_Widget_Taxonomy extends WP_Widget {
 		}
 		$permalink = get_term_link( $term );
 
+		$args['before_widget'] = str_replace( 'class="widget ', 'class="widget ' . $term->slug . ' ', $args['before_widget'] );
 		echo $args['before_widget'];
 
 		if ( ! empty( $instance['title'] ) ) {
@@ -99,11 +100,11 @@ class Display_Featured_Image_Genesis_Widget_Taxonomy extends WP_Widget {
 			$image_id  = Display_Featured_Image_Genesis_Common::get_image_id( $term_meta['term_image'] );
 			$image_src = wp_get_attachment_image_src( $image_id, $instance['image_size'] );
 			if ( $image_src ) {
-				$image = '<img src="' . $image_src[0] . '" title="' . $title . '" />';
+				$image = '<img src="' . esc_url( $image_src[0] ) . '" alt="' . esc_html( $title ) . '" />';
 			}
 
 			if ( $instance['show_image'] && $image ) {
-				printf( '<a href="%s" title="%s" class="%s">%s</a>', $permalink, esc_html( $title ), esc_attr( $instance['image_alignment'] ), $image );
+				printf( '<a href="%s" title="%s" class="%s">%s</a>', esc_url( $permalink ), esc_html( $title ), esc_attr( $instance['image_alignment'] ), $image );
 			}
 		}
 
@@ -112,9 +113,9 @@ class Display_Featured_Image_Genesis_Widget_Taxonomy extends WP_Widget {
 			if ( ! empty( $instance['show_title'] ) ) {
 
 				if ( genesis_html5() )
-					printf( '<h2 class="archive-title"><a href="%s">%s</a></h2>', $permalink, esc_html( $title ) );
+					printf( '<h2 class="archive-title"><a href="%s">%s</a></h2>', esc_url( $permalink ), esc_html( $title ) );
 				else
-					printf( '<h2><a href="%s">%s</a></h2>', $permalink, esc_html( $title ) );
+					printf( '<h2><a href="%s">%s</a></h2>', esc_url( $permalink ), esc_html( $title ) );
 
 			}
 
@@ -124,7 +125,7 @@ class Display_Featured_Image_Genesis_Widget_Taxonomy extends WP_Widget {
 
 			echo genesis_html5() ? '<div class="term-description">' : '';
 
-			$intro_text = apply_filters( 'genesis_term_intro_text_output', $term->meta['intro_text'] );
+			$intro_text = apply_filters( 'display_featured_image_genesis_term_description', $term->meta['intro_text'] );
 			if ( ! $intro_text ) {
 				$intro_text = $term->description;
 			}
@@ -286,11 +287,16 @@ class Display_Featured_Image_Genesis_Widget_Taxonomy extends WP_Widget {
 		// Build an appropriate JSON response containing this info
 		$list['none'] = '--';
 		foreach ( $terms as $term ) {
-			$list[$term->term_id] = $term->name;
+			$list[$term->term_id] = esc_attr( $term->name );
 		}
 
 		// And emit it
-		echo json_encode( $list );
+		if ( function_exists( 'wp_json_encode' ) ) {
+			echo wp_json_encode( $list );
+		}
+		else {
+			echo json_encode( $list );
+		}
 		die();
 	}
 

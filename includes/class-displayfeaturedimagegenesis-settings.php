@@ -207,7 +207,8 @@ class Display_Featured_Image_Genesis_Settings {
 	 */
 	public function set_default_image() {
 
-		$item = Display_Featured_Image_Genesis_Common::get_image_variables();
+		$item  = Display_Featured_Image_Genesis_Common::get_image_variables();
+		$large = absint( get_option( 'large_size_w' ) );
 
 		if ( ! empty( $this->displaysetting['default'] ) ) {
 			$preview = wp_get_attachment_image_src( $item->fallback_id, 'medium' );
@@ -219,7 +220,7 @@ class Display_Featured_Image_Genesis_Settings {
 		echo '<input type="button" class="upload_default_image button" value="' . __( 'Select Image', 'display-featured-image-genesis' ) . '" />';
 		echo '<p class="description">' . sprintf(
 			__( 'If you would like to use a default image for the featured image, upload it here. Must be at least %1$s pixels wide.', 'display-featured-image-genesis' ),
-			absint( $item->large + 1 )
+			absint( $large + 1 )
 		) . '</p>';
 	}
 
@@ -546,10 +547,12 @@ class Display_Featured_Image_Genesis_Settings {
 
 		$height_help =
 			'<h3>' . __( 'Height', 'display-featured-image-genesis' ) . '</h3>' .
-			'<p>' . __( 'Depending on how your header/nav are set up, or if you just do not want your backstretch image to extend to the bottom of the user screen, you may want to change this number. It will raise the bottom line of the backstretch image, making it shorter.', 'display-featured-image-genesis' ) . '</p>';
+			'<p>' . __( 'Depending on how your header/nav are set up, or if you just do not want your backstretch image to extend to the bottom of the user screen, you may want to change this number. It will raise the bottom line of the backstretch image, making it shorter.', 'display-featured-image-genesis' ) . '</p>' .
+			'<p>' . __( 'The plugin determines the size of your backstretch image based on the size of the user\'s browser window. Changing the "Height" setting tells the plugin to subtract that number of pixels from the measured height of the user\'s window, regardless of the size of that window.', 'display-featured-image-genesis' ) . '</p>' .
+			'<p>' . __( 'If you need to control the size of the backstretch Featured Image output with more attention to the user\'s screen size, you will want to consider a CSS approach instead. Check the readme for an example.', 'display-featured-image-genesis' ) . '</p>';
 
 		$default_help =
-			'<h3>' . __( 'Set a Default Featured Image', 'display-featured-image-genesis' ) . '</h3>' .
+			'<h3>' . __( 'Default Featured Image', 'display-featured-image-genesis' ) . '</h3>' .
 			'<p>' . __( 'You may set a large image to be used sitewide if a featured image is not available. This image will show on posts, pages, and archives.', 'display-featured-image-genesis' ) . '</p>' .
 			'<p>' . sprintf(
 				__( 'Supported file types are: jpg, jpeg, png, and gif. The image must be at least %1$s pixels wide.', 'display-featured-image-genesis' ),
@@ -557,7 +560,7 @@ class Display_Featured_Image_Genesis_Settings {
 			) . '</p>';
 
 		$skipfront_help =
-			'<h3>' . __( 'Show on Front Page', 'display-featured-image-genesis' ) . '</h3>' .
+			'<h3>' . __( 'Skip Front Page', 'display-featured-image-genesis' ) . '</h3>' .
 			'<p>' . __( 'If you set a Default Featured Image, it will show on every post/page of your site. This may not be desirable on child themes with a front page constructed with widgets, so you can select this option to prevent the Featured Image from showing on the front page. Checking this will prevent the Featured Image from showing on the Front Page, even if you have set an image for that page individually.', 'display-featured-image-genesis' ) . '</p>' .
 			'<p>' . sprintf(
 				__( 'If you want to prevent entire groups of posts from not using the Featured Image, you will want to <a href="%s" target="_blank">add a filter</a> to your theme functions.php file.', 'display-featured-image-genesis' ),
@@ -598,7 +601,7 @@ class Display_Featured_Image_Genesis_Settings {
 
 		$screen->add_help_tab( array(
 			'id'      => 'displayfeaturedimage_exclude_front-help',
-			'title'   => __( 'Show on Front Page', 'display-featured-image-genesis' ),
+			'title'   => __( 'Skip Front Page', 'display-featured-image-genesis' ),
 			'content' => $skipfront_help,
 		) );
 
