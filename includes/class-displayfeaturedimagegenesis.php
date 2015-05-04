@@ -70,8 +70,7 @@ class Display_Featured_Image_Genesis {
 	 */
 	public function error_message() {
 
-		$error = sprintf(
-			__( 'Sorry, Display Featured Image for Genesis works only with the Genesis Framework. It has been deactivated.', 'display-featured-image-genesis' ) );
+		$error = sprintf( __( 'Sorry, Display Featured Image for Genesis works only with the Genesis Framework. It has been deactivated.', 'display-featured-image-genesis' ) );
 
 		if ( version_compare( PHP_VERSION, '5.3', '<' ) ) {
 			$error = $error . sprintf(
@@ -80,7 +79,7 @@ class Display_Featured_Image_Genesis {
 			);
 		}
 
-		echo '<div class="error"><p>' . $error . '</p></div>';
+		echo '<div class="error"><p>' . esc_attr( $error ) . '</p></div>';
 
 		if ( isset( $_GET['activate'] ) ) {
 			unset( $_GET['activate'] );
@@ -123,10 +122,17 @@ class Display_Featured_Image_Genesis {
 			) );
 		}
 
-		//* new setting for titles added in 2.0.0
+		// new setting for titles added in 2.0.0
 		if ( empty( $displaysetting['keep_titles'] ) ) {
 			$this->update_settings( array(
 				'keep_titles' => 0
+			) );
+		}
+
+		// new setting for subsequent pages added in 2.2.0
+		if ( empty( $displaysetting['is_paged'] ) ) {
+			$this->update_settings( array(
+				'is_paged' => 0
 			) );
 		}
 

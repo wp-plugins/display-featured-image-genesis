@@ -13,7 +13,7 @@ class Display_Featured_Image_Genesis_Common {
 	 * @var string
 	 * @since  1.4.3
 	 */
-	public static $version = '2.1.0';
+	public static $version = '2.2.0';
 
 	protected static $post_types;
 
@@ -35,7 +35,7 @@ class Display_Featured_Image_Genesis_Common {
 		$displaysetting  = get_option( 'displayfeaturedimagegenesis' );
 		$move_excerpts   = $displaysetting['move_excerpts'];
 		$postspage_image = get_post_thumbnail_id( $postspage );
-		$fallback        = esc_attr( $displaysetting['default'] ); // url only
+		$fallback        = $displaysetting['default']; // url only
 		$medium          = absint( get_option( 'medium_size_w' ) );
 
 		if ( is_singular() ) { // just checking for handling conditional variables set by width
@@ -48,7 +48,11 @@ class Display_Featured_Image_Genesis_Common {
 
 		// sitewide variables used outside this function
 		$item->backstretch = '';
-		$item->fallback_id = self::get_image_id( $fallback ); // gets image id with attached metadata
+		$fallback_id = $fallback;
+		if ( ! is_numeric( $fallback ) ) {
+			$fallback_id = self::get_image_id( $fallback ); // gets image id with attached metadata
+		}
+		$item->fallback_id = absint( $fallback_id );
 
 		// Set Featured Image source ID
 		$image_id = ''; // blank if nothing else
@@ -84,8 +88,12 @@ class Display_Featured_Image_Genesis_Common {
 			elseif ( $object->post_type ) { // on singular
 				$post_type = $object->post_type;
 			}
-			if ( ! empty( $displaysetting['post_type'][$post_type] ) ) {
-				$image_id = self::get_image_id( $displaysetting['post_type'][$post_type] );
+			if ( ! empty( $displaysetting['post_type'][ $post_type ] ) ) {
+				$image_id = $displaysetting['post_type'][ $post_type ];
+				// if $image_id is using the old URL
+				if ( ! is_numeric( $displaysetting['post_type'][ $post_type ] ) ) {
+					$image_id = self::get_image_id( $displaysetting['post_type'][ $post_type ] );
+				}
 			}
 		}
 		// taxonomy
@@ -94,7 +102,11 @@ class Display_Featured_Image_Genesis_Common {
 			$term_meta = get_option( "displayfeaturedimagegenesis_$t_id" );
 			// if there is a term image
 			if ( ! empty( $term_meta['term_image'] ) ) {
-				$image_id = self::get_image_id( $term_meta['term_image'] );
+				$image_id = $term_meta['term_image'];
+				// if $image_id is using the old URL
+				if ( ! is_numeric( $term_meta['term_image'] ) ) {
+					$image_id = self::get_image_id( $term_meta['term_image'] );
+				}
 			}
 		}
 		// any singular post/page/CPT or there is no $fallback
@@ -117,6 +129,16 @@ class Display_Featured_Image_Genesis_Common {
 			}
 		}
 
+		/**
+		 * filter to use a different image id
+		 * @var $image_id
+		 *
+		 * @since 2.2.0
+		 */
+		$image_id = apply_filters( 'display_featured_image_genesis_image_id', $image_id );
+		// make sure the image id is an integer
+		$image_id = is_numeric( $image_id ) ? absint( $image_id ) : 0;
+
 		// turn Photon off so we can get the correct image
 		$photon_removed = '';
 		if ( class_exists( 'Jetpack' ) && Jetpack::is_module_active( 'photon' ) ) {
@@ -134,6 +156,7 @@ class Display_Featured_Image_Genesis_Common {
 		if ( in_array( get_post_type(), $use_large_image ) ) {
 			$image_size = 'large';
 		}
+
 		$item->backstretch = wp_get_attachment_image_src( $image_id, $image_size );
 
 		// set a content variable so backstretch doesn't show if full size image exists in post.
@@ -200,9 +223,19 @@ class Display_Featured_Image_Genesis_Common {
 	 * @author Philip Newcomer
 	 * @link   http://philipnewcomer.net/2012/11/get-the-attachment-id-from-an-image-url-in-wordpress/
 	 */
-	public static function get_image_id( $attachment_url ) {
-		global $wpdb;
+	public static function get_image_id( $attachment_url = '' ) {
+
 		$attachment_id = false;
+
+		// as of 2.2.0, if a (new) image id is passed to the function, return it as is.
+		if ( is_numeric( $attachment_url ) ) {
+			return $attachment_url;
+		}
+
+		// If there is no url, return.
+		if ( '' == $attachment_url ) {
+			return;
+		}
 
 		// Get the upload directory paths
 		$upload_dir_paths = wp_upload_dir();
@@ -210,18 +243,60 @@ class Display_Featured_Image_Genesis_Common {
 		// Make sure the upload path base directory exists in the attachment URL, to verify that we're working with a media library image
 		if ( false !== strpos( $attachment_url, $upload_dir_paths['baseurl'] ) ) {
 
-			// If this is the URL of an auto-generated thumbnail, get the URL of the original image
-			$attachment_url = preg_replace( '(-\d{3,4}x\d{3,4}.)', '.', $attachment_url );
-
 			// Remove the upload path base directory from the attachment URL
-			$attachment_url = str_replace( $upload_dir_paths['baseurl'] . '/', '', $attachment_url );
+			$attachment_url = str_replace( trailingslashit( $upload_dir_paths['baseurl'] ), '', $attachment_url );
+
+			// If this is the URL of an auto-generated thumbnail, get the URL of the original image
+			$url_stripped   = preg_replace( '/-\d+x\d+(?=\.(jpg|jpeg|png|gif)$)/i', '', $attachment_url );
 
 			// Finally, run a custom database query to get the attachment ID from the modified attachment URL
-			$attachment_id = $wpdb->get_var( $wpdb->prepare( "SELECT wposts.ID FROM $wpdb->posts wposts, $wpdb->postmeta wpostmeta WHERE wposts.ID = wpostmeta.post_id AND wpostmeta.meta_key = '_wp_attached_file' AND wpostmeta.meta_value = '%s' AND wposts.post_type = 'attachment'", $attachment_url ) );
+			$attachment_id  = self::fetch_image_id_query( $url_stripped, $attachment_url );
 
 		}
 
 		return $attachment_id;
+	}
+
+	/**
+	 * Fetch image ID from database
+	 * @param  var $url_stripped   image url without WP resize string (eg 150x150)
+	 * @param  var $attachment_url image url
+	 * @return int (image id)                 image ID, or false
+	 *
+	 * @since 2.2.0
+	 *
+	 * @author hellofromtonya
+	 */
+	protected static function fetch_image_id_query( $url_stripped, $attachment_url ) {
+
+		global $wpdb;
+
+		$query_sql = $wpdb->prepare(
+			"
+				SELECT wposts.ID
+				FROM {$wpdb->posts} wposts, {$wpdb->postmeta} wpostmeta
+				WHERE wposts.ID = wpostmeta.post_id AND wpostmeta.meta_key = '_wp_attached_file' AND wpostmeta.meta_value IN ( %s, %s ) AND wposts.post_type = 'attachment'
+			",
+			$url_stripped, $attachment_url
+		);
+
+		$result = $wpdb->get_col( $query_sql );
+
+		return empty( $result ) || ! is_numeric( $result[0] ) ? false : intval( $result[0] );
+	}
+
+	/**
+	 * add a filter to change the minimum width required for backstretch image
+	 * @return integer sets the minimum width for backstretch effect
+	 *
+	 * @since 2.2.0
+	 */
+	public static function minimum_backstretch_width() {
+		$large = apply_filters( 'display_featured_image_genesis_set_minimum_backstretch_width', get_option( 'large_size_w' ) );
+		if ( ! is_numeric( $large ) ) {
+			$large = get_option( 'large_size_w' );
+		}
+		return absint( intval( $large ) );
 	}
 
 }

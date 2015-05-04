@@ -3,11 +3,11 @@
 /**
  * Dependent class to establish/display columns for featured images
  *
- * @package DisplayFeaturedImageGenesis
+ * @package   DisplayFeaturedImageGenesis
  * @author    Robin Cornett <hello@robincornett.com>
  * @license   GPL-2.0+
  * @link      http://robincornett.com
- * @copyright 2014 Robin Cornett Creative, LLC
+ * @copyright 2015 Robin Cornett Creative, LLC
  * @since 2.0.0
  */
 
@@ -27,7 +27,7 @@ class Display_Featured_Image_Genesis_Admin {
 	 */
 	public function set_up_taxonomy_columns() {
 		$args       = array(
-			'public' => true
+			'public' => true,
 		);
 		$output     = 'names';
 		$taxonomies = get_taxonomies( $args, $output );
@@ -52,10 +52,11 @@ class Display_Featured_Image_Genesis_Admin {
 		$post_types['post'] = 'post';
 		$post_types['page'] = 'page';
 		foreach ( $post_types as $post_type ) {
-			if ( post_type_supports( $post_type, 'thumbnail' ) ) {
-				add_filter( "manage_edit-{$post_type}_columns", array( $this, 'add_column' ) );
-				add_action( "manage_{$post_type}_posts_custom_column", array( $this, 'custom_post_columns' ), 10, 2 );
+			if ( ! post_type_supports( $post_type, 'thumbnail' ) ) {
+				return;
 			}
+			add_filter( "manage_edit-{$post_type}_columns", array( $this, 'add_column' ) );
+			add_action( "manage_{$post_type}_posts_custom_column", array( $this, 'custom_post_columns' ), 10, 2 );
 		}
 	}
 
@@ -87,16 +88,32 @@ class Display_Featured_Image_Genesis_Admin {
 	 */
 	public function manage_taxonomy_column( $value, $column, $term_id ) {
 
-		$taxonomy = get_current_screen()->taxonomy;
-		if ( 'featured_image' === $column ) {
-			$term_meta = get_option( "displayfeaturedimagegenesis_$term_id" );
-			if ( ! empty( $term_meta['term_image'] ) ) {
-				$alt_tag = get_term( $term_id, $taxonomy )->name;
-                $id      = Display_Featured_Image_Genesis_Common::get_image_id( $term_meta['term_image'] );
-                $preview = apply_filters( 'display_featured_image_genesis_admin_term_thumbnail', wp_get_attachment_image_src( $id, 'thumbnail' ), $id );
-				echo '<img src="' . $preview[0] . '" alt="' . $alt_tag . '" />';
-			}
+		if ( 'featured_image' !== $column ) {
+			return;
 		}
+
+		$term_meta = get_option( "displayfeaturedimagegenesis_$term_id" );
+
+		if ( empty( $term_meta['term_image'] ) ) {
+			return;
+		}
+
+		$taxonomy = filter_input( INPUT_POST, 'taxonomy', FILTER_SANITIZE_STRING );
+		$taxonomy = ! is_null( $taxonomy ) ? $taxonomy : get_current_screen()->taxonomy;
+		$alt      = get_term( $term_id, $taxonomy )->name;
+		$id       = $term_meta['term_image'];
+
+		if ( ! is_numeric( $term_meta['term_image'] ) ) {
+			$id = Display_Featured_Image_Genesis_Common::get_image_id( $term_meta['term_image'] );
+		}
+
+		$preview = apply_filters(
+			'display_featured_image_genesis_admin_term_thumbnail',
+			wp_get_attachment_image_src( $id, 'thumbnail' ),
+			$id
+		);
+
+		echo '<img src="' . esc_url( $preview[0] ) . '" alt="' . esc_attr( $alt ) . '" />';
 
 	}
 
@@ -110,13 +127,21 @@ class Display_Featured_Image_Genesis_Admin {
 	 */
 	public function custom_post_columns( $column, $post_id ) {
 
-		if ( 'featured_image' === $column ) {
-			$id      = get_post_thumbnail_id( $post_id );
-			$preview = apply_filters( 'display_featured_image_genesis_admin_post_thumbnail', wp_get_attachment_image_src( $id, 'thumbnail' ), $id );
-			if ( $id ) {
-				echo '<img src="' . $preview[0] . '" alt="' . the_title_attribute( 'echo=0' ) . '" />';
-			}
+		if ( 'featured_image' !== $column ) {
+			return;
 		}
+
+		$id = get_post_thumbnail_id( $post_id );
+		if ( ! $id ) {
+			return;
+		}
+
+		$preview = apply_filters(
+			'display_featured_image_genesis_admin_post_thumbnail',
+			wp_get_attachment_image_src( $id, 'thumbnail' ),
+			$id
+		);
+		echo '<img src="' . esc_url( $preview[0] ) . '" alt="' . esc_attr( the_title_attribute( 'echo=0' ) ) . '" />';
 
 	}
 

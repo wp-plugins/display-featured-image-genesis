@@ -25,12 +25,15 @@ function display_featured_image_genesis_get_term_image_id() {
 		$t_id      = $term->term_id;
 		$term_meta = get_option( "displayfeaturedimagegenesis_$t_id" );
 		if ( ! empty( $term_meta['term_image'] ) ) {
-			$image_id = Display_Featured_Image_Genesis_Common::get_image_id( $term_meta['term_image'] );
+			$image_id = $term_meta['term_image'];
+			if ( ! is_numeric( $term_meta['term_image'] ) ) {
+				$image_id = Display_Featured_Image_Genesis_Common::get_image_id( $term_meta['term_image'] );
+			}
 			break;
 		}
 	}
 
-	return $image_id;
+	return absint( $image_id );
 
 }
 
@@ -41,12 +44,12 @@ function display_featured_image_genesis_get_term_image_id() {
  *
  * @since  2.1.0
  */
-function display_featured_image_genesis_get_term_image_url( $size='displayfeaturedimage_backstretch' ) {
+function display_featured_image_genesis_get_term_image_url( $size = 'displayfeaturedimage_backstretch' ) {
 
 	$image_id  = display_featured_image_genesis_get_term_image_id();
 	$image_url = wp_get_attachment_image_src( $image_id, $size );
 
-	return $image_url[0];
+	return esc_url( $image_url[0] );
 
 }
 
@@ -58,11 +61,15 @@ function display_featured_image_genesis_get_term_image_url( $size='displayfeatur
  */
 function display_featured_image_genesis_get_default_image_id() {
 
-	$image_id = '';
-	$item     = Display_Featured_Image_Genesis_Common::get_image_variables();
-	$image_id = $item->fallback_id;
+	$image_id       = '';
+	$displaysetting = get_option( 'displayfeaturedimagegenesis' );
+	$fallback       = $displaysetting['default'];
+	$image_id       = $fallback;
+	if ( ! is_numeric( $fallback ) ) {
+		$image_id = self::get_image_id( $fallback ); // gets image id with attached metadata
+	}
 
-	return $image_id;
+	return absint( $image_id );
 
 }
 
@@ -73,12 +80,12 @@ function display_featured_image_genesis_get_default_image_id() {
  *
  * @since  2.1.0
  */
-function display_featured_image_genesis_get_default_image_url( $size='displayfeaturedimage_backstretch' ) {
+function display_featured_image_genesis_get_default_image_url( $size = 'displayfeaturedimage_backstretch' ) {
 
 	$image_id  = display_featured_image_genesis_get_default_image_id();
 	$image_url = wp_get_attachment_image_src( $image_id, $size );
 
-	return $image_url[0];
+	return esc_url( $image_url[0] );
 
 }
 
@@ -106,11 +113,14 @@ function display_featured_image_genesis_get_cpt_image_id() {
 	elseif ( $object->post_type ) { // on singular
 		$post_type = $object->post_type;
 	}
-	if ( ! empty( $displaysetting['post_type'][$post_type] ) ) {
-		$image_id = Display_Featured_Image_Genesis_Common::get_image_id( $displaysetting['post_type'][$post_type] );
+	if ( ! empty( $displaysetting['post_type'][ $post_type ] ) ) {
+		$image_id = $displaysetting['post_type'][ $post_type ];
+		if ( ! is_numeric( $displaysetting['post_type'][ $post_type ] ) ) {
+			$image_id = Display_Featured_Image_Genesis_Common::get_image_id( $displaysetting['post_type'][ $post_type ] );
+		}
 	}
 
-	return $image_id;
+	return absint( $image_id );
 }
 
 /**
@@ -120,51 +130,69 @@ function display_featured_image_genesis_get_cpt_image_id() {
  *
  * @since  2.1.0
  */
-function display_featured_image_genesis_get_cpt_image_url( $size='displayfeaturedimage_backstretch' ) {
+function display_featured_image_genesis_get_cpt_image_url( $size = 'displayfeaturedimage_backstretch' ) {
 
 	$image_id  = display_featured_image_genesis_get_cpt_image_id();
 	$image_url = wp_get_attachment_image_src( $image_id, $size );
 
-	return $image_url[0];
+	return esc_url( $image_url[0] );
 
 }
 
 /**
- * Add term/default image to blog/archive pages.
+ * Add term/default image to blog/archive pages. Use:
+ * add_action( 'genesis_entry_content', 'display_featured_image_genesis_add_archive_thumbnails', 5 );
  * @return image If a post doesn't have its own thumbnail, you can use this function to add one to archive pages.
  *
  * @since  2.1.0
  */
 function display_featured_image_genesis_add_archive_thumbnails() {
 
-	if ( is_singular() || is_admin() || is_404() ) {
+	$show_thumbs = genesis_get_option( 'content_archive_thumbnail' );
+
+	if ( is_singular() || is_admin() || is_404() || ! $show_thumbs ) {
 		return;
 	}
 
-	if ( has_post_thumbnail() ) {
+	$args = array(
+		'post_mime_type' => 'image',
+		'post_parent'    => get_the_ID(),
+		'post_type'      => 'attachment',
+	);
+	$attached_images = get_children( $args );
+
+	if ( has_post_thumbnail() || $attached_images ) {
 		return;
 	}
 
-	$size      = genesis_get_option( 'image_size' );
-	$image_url = display_featured_image_genesis_get_term_image_url( $size );
-	if ( empty( $image_url ) ) {
-		$image_url = display_featured_image_genesis_get_cpt_image_url( $size );
-		if ( empty( $image_url ) ) {
-			$image_url = display_featured_image_genesis_get_default_image_url( $size );
+	$image_id = display_featured_image_genesis_get_term_image_id();
+	if ( empty( $image_id ) ) {
+		$image_id = display_featured_image_genesis_get_cpt_image_id();
+		if ( empty( $image_id ) ) {
+			$image_id = display_featured_image_genesis_get_default_image_id();
 		}
 	}
 
-	if ( empty( $image_url ) ) {
+	if ( empty( $image_id ) ) {
 		return;
 	}
 
-	$permalink = get_the_permalink();
-	$alignment = genesis_get_option( 'image_alignment' );
-	$image     = sprintf( '<a href="%s"><img src="%s" class="%s" /></a>',
+	$image = genesis_get_image( array(
+		/**
+		 * Filter the fallback image ID
+		 *
+		 * @since 2.2.0
+		 */
+		'fallback' => apply_filters( 'display_featured_image_genesis_fallback_archive_thumbnail', $image_id ),
+		'size'     => genesis_get_option( 'image_size' ),
+		'attr'     => genesis_parse_attr( 'entry-image', array( 'alt' => get_the_title() ) ),
+		'context'  => 'archive',
+	) );
+
+	$permalink = get_permalink();
+	printf( '<a href="%1$s" aria-hidden="true">%2$s</a>',
 		esc_url( $permalink ),
-		esc_url( $image_url ),
-		esc_attr( $alignment )
+		$image
 	);
-	echo $image;
 
 }

@@ -110,7 +110,10 @@ class Display_Featured_Image_Genesis_Widget_CPT extends WP_Widget {
 			$image_id = $postspage_image;
 		}
 		else {
-			$image_id = Display_Featured_Image_Genesis_Common::get_image_id( $option['post_type'][$post_type->name] );
+			$image_id = $option['post_type'][$post_type->name];
+			if ( ! is_numeric( $option['post_type'][$post_type->name] ) ) {
+				$image_id = Display_Featured_Image_Genesis_Common::get_image_id( $option['post_type'][$post_type->name] );
+			}
 		}
 		$image_src = wp_get_attachment_image_src( $image_id, $instance['image_size'] );
 		if ( $image_src ) {
@@ -118,7 +121,8 @@ class Display_Featured_Image_Genesis_Widget_CPT extends WP_Widget {
 		}
 
 		if ( $instance['show_image'] && $image ) {
-			printf( '<a href="%s" title="%s" class="%s">%s</a>', $permalink, esc_html( $title ), esc_attr( $instance['image_alignment'] ), $image );
+			$role = empty( $instance['show_title'] ) ? '' : 'aria-hidden="true"';
+			printf( '<a href="%s" title="%s" class="%s" %s>%s</a>', $permalink, esc_html( $title ), esc_attr( $instance['image_alignment'] ), $role, $image );
 		}
 
 		if ( $instance['show_title'] ) {
