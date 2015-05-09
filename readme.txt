@@ -5,7 +5,7 @@ Donate link: https://robincornett.com/donate/
 Tags: backstretch, featured image, featured images, genesis, studiopress, post thumbnails, featured image rss, rss
 Requires at least: 3.8
 Tested up to: 4.2
-Stable tag: 2.2.0
+Stable tag: 2.2.1
 License: GPL-2.0+
 License URI: http://www.gnu.org/licenses/gpl-2.0.txt
 
@@ -73,7 +73,8 @@ Available filters include, but are not limited to:
 
 * `display_featured_image_genesis_skipped_posttypes`: select post type(s) which will not have the featured image effect applied
 * `display_featured_image_genesis_use_default`: force post type(s) to use your sitewide default image (set on the main plugin settings page) for the featured image effect, regardless of what is set as the individual post's featured image
-* `display_featured_image_genesis_use_taxonomy`: force post type(s) to use a taxonomy term's image for the featured image effect, regardless of what is set as the individual post's featured image
+* `displayfeaturedimagegenesis_use_post_type_image`: force post type(s) to use the image assigned as the custom post type featured image (if one is set), regardless of what is set as the individual post's featured image
+* `display_featured_image_genesis_use_taxonomy`: force post type(s) to use a taxonomy term's image (if one is set) for the featured image effect, regardless of what is set as the individual post's featured image
 * `display_featured_image_genesis_use_large_image`: force post type(s) to output the featured image as a large image above the post content, and to not use the backstretch effect at all
 * `display_featured_image_genesis_omit_excerpt`: force post type(s) to not move the excerpt to overlay the featured image, even if the "Move Excerpts/Archive Descriptions" setting is selected
 
@@ -161,10 +162,14 @@ This will follow the settings you choose in the Genesis Theme Settings.
 3. Quickly see the featured image assigned to each post or term.
 
 == Upgrade Notice ==
-= 2.2.0 =
-Changed how default, term, and post type featured images are stored in the database (better!).
+= 2.2.1 =
+Bugfixes: image ID is correctly set in sequence
 
 == Changelog ==
+
+= 2.2.1 =
+* fixed fallback filters
+* escaped even more things
 
 = 2.2.0 =
 * default, term, and custom post type featured images are now stored in the database by ID, rather than URL.
