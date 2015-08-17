@@ -15,9 +15,8 @@
  *
  * @since  2.1.0
  */
-function display_featured_image_genesis_get_term_image_id() {
+function display_featured_image_genesis_get_term_image_id( $image_id = '' ) {
 
-	$image_id   = '';
 	$taxonomies = get_taxonomies();
 	$args       = array( 'orderby' => 'count', 'order' => 'DESC' );
 	$terms      = wp_get_object_terms( get_the_ID(), $taxonomies, $args );
@@ -26,15 +25,12 @@ function display_featured_image_genesis_get_term_image_id() {
 		$t_id      = $term->term_id;
 		$term_meta = get_option( "displayfeaturedimagegenesis_$t_id" );
 		if ( ! empty( $term_meta['term_image'] ) ) {
-			$image_id = $term_meta['term_image'];
-			if ( ! is_numeric( $term_meta['term_image'] ) ) {
-				$image_id = Display_Featured_Image_Genesis_Common::get_image_id( $term_meta['term_image'] );
-			}
+			$image_id = displayfeaturedimagegenesis_check_image_id( $term_meta['term_image'] );
 			break;
 		}
 	}
 
-	return absint( $image_id );
+	return (int) $image_id;
 
 }
 
@@ -60,17 +56,13 @@ function display_featured_image_genesis_get_term_image_url( $size = 'displayfeat
  *
  * @since  2.1.0
  */
-function display_featured_image_genesis_get_default_image_id() {
+function display_featured_image_genesis_get_default_image_id( $image_id = '' ) {
 
-	$image_id       = '';
 	$displaysetting = get_option( 'displayfeaturedimagegenesis' );
 	$fallback       = $displaysetting['default'];
-	$image_id       = $fallback;
-	if ( ! is_numeric( $fallback ) ) {
-		$image_id = Display_Featured_Image_Genesis_Common::get_image_id( $fallback ); // gets image id with attached metadata
-	}
+	$image_id       = displayfeaturedimagegenesis_check_image_id( $fallback );
 
-	return absint( $image_id );
+	return (int) $image_id;
 
 }
 
@@ -96,9 +88,9 @@ function display_featured_image_genesis_get_default_image_url( $size = 'displayf
  *
  * @since  2.1.0
  */
-function display_featured_image_genesis_get_cpt_image_id() {
+function display_featured_image_genesis_get_cpt_image_id( $image_id = '' ) {
 
-	$image_id = $post_type = '';
+	$post_type      = '';
 	$displaysetting = get_option( 'displayfeaturedimagegenesis' );
 	$object         = get_queried_object();
 	if ( ! $object || is_admin() ) {
@@ -106,22 +98,17 @@ function display_featured_image_genesis_get_cpt_image_id() {
 	}
 	if ( $object->name ) { // results in post type on cpt archive
 		$post_type = $object->name;
-	}
-	elseif ( $object->taxonomy ) { // on a tax/term/category
+	} elseif ( $object->taxonomy ) { // on a tax/term/category
 		$tax_object = get_taxonomy( $object->taxonomy );
 		$post_type  = $tax_object->object_type[0];
-	}
-	elseif ( $object->post_type ) { // on singular
+	} elseif ( $object->post_type ) { // on singular
 		$post_type = $object->post_type;
 	}
 	if ( ! empty( $displaysetting['post_type'][ $post_type ] ) ) {
-		$image_id = $displaysetting['post_type'][ $post_type ];
-		if ( ! is_numeric( $displaysetting['post_type'][ $post_type ] ) ) {
-			$image_id = Display_Featured_Image_Genesis_Common::get_image_id( $displaysetting['post_type'][ $post_type ] );
-		}
+		$image_id = displayfeaturedimagegenesis_check_image_id( $displaysetting['post_type'][ $post_type ] );
 	}
 
-	return absint( $image_id );
+	return (int) $image_id;
 }
 
 /**
@@ -196,4 +183,16 @@ function display_featured_image_genesis_add_archive_thumbnails() {
 		wp_kses_post( $image )
 	);
 
+}
+
+/**
+ * function to check image_id value, convert from URL if necessary
+ * @param  string $image_id int or URL string
+ * @return int           image ID
+ *
+ * @since 2.3.0
+ */
+function displayfeaturedimagegenesis_check_image_id( $image_id = '' ) {
+	$image_id = is_numeric( $image_id ) ? $image_id : Display_Featured_Image_Genesis_Common::get_image_id( $image_id );
+	return $image_id;
 }

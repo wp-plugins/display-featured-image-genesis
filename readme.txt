@@ -4,8 +4,8 @@ Contributors: littler.chicken
 Donate link: https://robincornett.com/donate/
 Tags: backstretch, featured image, featured images, genesis, studiopress, post thumbnails, featured image rss, rss
 Requires at least: 3.8
-Tested up to: 4.2
-Stable tag: 2.2.2
+Tested up to: 4.3
+Stable tag: 2.3.0
 License: GPL-2.0+
 License URI: http://www.gnu.org/licenses/gpl-2.0.txt
 
@@ -41,7 +41,7 @@ Now you can add the Featured Image from each post to your RSS feed. This is an o
 
 You can check/change your feed settings on your site's Settings > Reading page.
 
-_If you are already inserting your Featured Image into your feed through another function or plugin, you'll want to remove that before activating this feature; otherwise you will have two copies of the image added to your feed!_
+_If you are already inserting your Featured Image into your feed through another function or plugin, you'll want to remove that before activating this feature; otherwise you will have two copies of the image added to your feed! If you are using Send Images to RSS, don't worry about it. I've made sure these two plugins coexist happily._
 
 = Simple Styling =
 
@@ -162,10 +162,18 @@ This will follow the settings you choose in the Genesis Theme Settings.
 3. Quickly see the featured image assigned to each post or term.
 
 == Upgrade Notice ==
-= 2.2.2 =
-Bugfix: default image ID function
+= 2.3.0 =
+New features: featured images for authors, smaller images loaded for smaller screens!
 
 == Changelog ==
+
+= 2.3.0 =
+* new: set a featured image for each author!
+* new: load smaller images on smaller screens!
+* added hooks to title output over backstretch images
+* added settings page link to plugin table
+* refactored settings page
+* bugfix: admin column output
 
 = 2.2.2 =
 * fixed default image id function error

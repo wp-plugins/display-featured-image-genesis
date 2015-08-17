@@ -21,7 +21,7 @@ class Display_Featured_Image_Genesis_Description {
 	 * @return null Return early if not a single post with an excerpt.
 	 */
 
-	public static function do_excerpt() {
+	public function do_excerpt() {
 
 		if ( ! is_singular() || is_front_page() ) {
 			return;
@@ -38,7 +38,7 @@ class Display_Featured_Image_Genesis_Description {
 			$intro_text = apply_filters( 'display_featured_image_genesis_singular_description', get_the_excerpt() );
 		}
 		if ( $headline || $intro_text ) {
-			printf( '<div class="excerpt">%s</div>', $headline . wpautop( $intro_text ) );
+			printf( '<div class="excerpt">%s</div>', wp_kses_post( $headline . wpautop( $intro_text ) ) );
 		}
 	}
 
@@ -53,30 +53,40 @@ class Display_Featured_Image_Genesis_Description {
 	 *
 	 * @return null Return early if not blog/front page.
 	 */
-	public static function do_front_blog_excerpt() {
+	public function do_front_blog_excerpt() {
 
 		if ( ! is_front_page() && ! is_home() ) {
 			return;
 		}
 
-		$frontpage  = get_option( 'show_on_front' );
-		$postspage  = get_post( get_option( 'page_for_posts' ) );
-		$headline   = '';
-		$intro_text = get_bloginfo( 'description' );
+		// set front page and posts page variables
+		$frontpage = get_option( 'show_on_front' );
+		$postspage = get_post( get_option( 'page_for_posts' ) );
+
+		/**
+		 * filter to show title on front page
+		 * @return boolean true/false
+		 *
+		 * @since 2.3.0
+		 */
+		$show_front_page_title = apply_filters( 'display_featured_image_genesis_excerpt_show_front_page_title', false );
+		$show_front_page_title = true === $show_front_page_title ? $show_front_page_title : false;
+
+		$title      = $show_front_page_title ? get_the_title() : '';
+		$intro_text = get_the_excerpt() ? get_the_excerpt() : get_bloginfo( 'description' );
+		$itemprop   = genesis_html5() ? 'itemprop="headline"' : '';
 
 		if ( is_home() && 'page' === $frontpage ) {
-			$itemprop = '';
-			if ( genesis_html5() ) {
-				$itemprop = 'itemprop="headline"';
-			}
-			$headline   = sprintf( '<h1 class="entry-title" ' . $itemprop . '>%s</h1>', $postspage->post_title );
+			$title      = $postspage->post_title;
 			$intro_text = $postspage->post_excerpt;
 		}
 
+		$title      = apply_filters( 'display_featured_image_genesis_front_blog_title', $title );
+		$headline   = $title ? sprintf( '<h1 class="entry-title" ' . $itemprop . '>%s</h1>', $title ) : '';
 		$intro_text = apply_filters( 'display_featured_image_genesis_front_blog_description', $intro_text );
 
 		if ( $headline || $intro_text ) {
-			printf( '<div class="excerpt">%s</div>', $headline . wpautop( $intro_text ) );
+			printf( '<div class="excerpt">%s</div>', wp_kses_post( $headline . wpautop( $intro_text ) ) );
 		}
 
 	}
@@ -96,7 +106,7 @@ class Display_Featured_Image_Genesis_Description {
 	 * @return null Return early if not the correct archive page, not page one, or no term meta is set.
 	 */
 
-	public static function do_tax_description() {
+	public function do_tax_description() {
 
 		global $wp_query;
 
@@ -117,7 +127,7 @@ class Display_Featured_Image_Genesis_Description {
 		$intro_text = apply_filters( 'display_featured_image_genesis_term_description', $term->meta['intro_text'] );
 
 		if ( $intro_text ) {
-			printf( '<div class="archive-description taxonomy-description">%s</div>', wpautop( $intro_text ) );
+			printf( '<div class="archive-description taxonomy-description">%s</div>', wp_kses_post( wpautop( $intro_text ) ) );
 		}
 
 	}
@@ -136,7 +146,7 @@ class Display_Featured_Image_Genesis_Description {
 	 * @return null Return early if not author archive or not page one.
 	 */
 
-	public static function do_author_description() {
+	public function do_author_description() {
 
 		if ( ! is_author() || get_query_var( 'paged' ) >= 2 ) {
 			return;
@@ -145,7 +155,7 @@ class Display_Featured_Image_Genesis_Description {
 		$intro_text = apply_filters( 'display_featured_image_genesis_author_description', get_the_author_meta( 'intro_text', (int) get_query_var( 'author' ) ) );
 
 		if ( $intro_text ) {
-			printf( '<div class="archive-description author-description">%s</div>', wpautop( $intro_text ) );
+			printf( '<div class="archive-description author-description">%s</div>', wp_kses_post( wpautop( $intro_text ) ) );
 		}
 
 	}
@@ -168,7 +178,7 @@ class Display_Featured_Image_Genesis_Description {
 	 * @return null Return early if not on relevant post type archive.
 	 */
 
-	public static function do_cpt_archive_description() {
+	public function do_cpt_archive_description() {
 
 		if ( ! is_post_type_archive() || ! genesis_has_post_type_archive_support() ) {
 			return;
@@ -181,7 +191,7 @@ class Display_Featured_Image_Genesis_Description {
 		$intro_text = apply_filters( 'display_featured_image_genesis_cpt_description', genesis_get_cpt_option( 'intro_text' ) );
 
 		if ( $intro_text ) {
-			printf( '<div class="archive-description cpt-archive-description">%s</div>', wpautop( $intro_text ) );
+			printf( '<div class="archive-description cpt-archive-description">%s</div>', wp_kses_post( wpautop( $intro_text ) ) );
 		}
 
 	}

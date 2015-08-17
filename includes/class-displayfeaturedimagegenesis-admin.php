@@ -13,9 +13,13 @@
 
 class Display_Featured_Image_Genesis_Admin {
 
+	protected $common;
+
 	public function set_up_columns() {
+		$this->common = new Display_Featured_Image_Genesis_Common();
 		$this->set_up_taxonomy_columns();
 		$this->set_up_post_type_columns();
+		$this->set_up_author_columns();
 
 		add_action( 'admin_enqueue_scripts', array( $this, 'featured_image_column_width' ) );
 	}
@@ -25,7 +29,7 @@ class Display_Featured_Image_Genesis_Admin {
 	 *
 	 * @since  2.0.0
 	 */
-	public function set_up_taxonomy_columns() {
+	protected function set_up_taxonomy_columns() {
 		$args       = array(
 			'public' => true,
 		);
@@ -42,7 +46,7 @@ class Display_Featured_Image_Genesis_Admin {
 	 *
 	 * @since  2.0.0
 	 */
-	public function set_up_post_type_columns() {
+	protected function set_up_post_type_columns() {
 		$args       = array(
 			'public'   => true,
 			'_builtin' => false,
@@ -53,11 +57,21 @@ class Display_Featured_Image_Genesis_Admin {
 		$post_types['page'] = 'page';
 		foreach ( $post_types as $post_type ) {
 			if ( ! post_type_supports( $post_type, 'thumbnail' ) ) {
-				return;
+				continue;
 			}
 			add_filter( "manage_edit-{$post_type}_columns", array( $this, 'add_column' ) );
 			add_action( "manage_{$post_type}_posts_custom_column", array( $this, 'custom_post_columns' ), 10, 2 );
 		}
+	}
+
+	/**
+	 * Set up featured image column for users
+	 *
+	 * @since 2.3.0
+	 */
+	protected function set_up_author_columns() {
+		add_filter( 'manage_users_columns', array( $this, 'add_column' ) );
+		add_action( 'manage_users_custom_column', array( $this, 'manage_user_column' ), 10, 3 );
 	}
 
 	/**
@@ -100,23 +114,15 @@ class Display_Featured_Image_Genesis_Admin {
 
 		$taxonomy = filter_input( INPUT_POST, 'taxonomy', FILTER_SANITIZE_STRING );
 		$taxonomy = ! is_null( $taxonomy ) ? $taxonomy : get_current_screen()->taxonomy;
-		$alt      = get_term( $term_id, $taxonomy )->name;
-		$id       = $term_meta['term_image'];
+		$image_id = displayfeaturedimagegenesis_check_image_id( $term_meta['term_image'] );
 
-		if ( ! is_numeric( $term_meta['term_image'] ) ) {
-			$id = Display_Featured_Image_Genesis_Common::get_image_id( $term_meta['term_image'] );
-		}
-
-		$preview = apply_filters(
-			'display_featured_image_genesis_admin_term_thumbnail',
-			wp_get_attachment_image_src( $id, 'thumbnail' ),
-			$id
+		$args = array(
+			'image_id' => $image_id,
+			'context'  => 'term',
+			'alt'      => get_term( $term_id, $taxonomy )->name,
 		);
 
-		printf( '<img src="%1$s" alt="%2$s" />',
-			esc_url( $preview[0] ),
-			esc_attr( $alt )
-		);
+		echo wp_kses_post( $this->admin_featured_image( $args ) );
 
 	}
 
@@ -133,21 +139,18 @@ class Display_Featured_Image_Genesis_Admin {
 		if ( 'featured_image' !== $column ) {
 			return;
 		}
-
-		$id = get_post_thumbnail_id( $post_id );
-		if ( ! $id ) {
+		$image_id = get_post_thumbnail_id( $post_id );
+		if ( ! $image_id ) {
 			return;
 		}
 
-		$preview = apply_filters(
-			'display_featured_image_genesis_admin_post_thumbnail',
-			wp_get_attachment_image_src( $id, 'thumbnail' ),
-			$id
+		$args = array(
+			'image_id' => $image_id,
+			'context'  => 'post',
+			'alt'      => the_title_attribute( 'echo=0' ),
 		);
-		printf( '<img src="%1$s" alt="%2$s" />',
-			esc_url( $preview[0] ),
-			esc_attr( the_title_attribute( 'echo=0' ) )
-		);
+
+		echo wp_kses_post( $this->admin_featured_image( $args ) );
 
 	}
 
@@ -157,12 +160,57 @@ class Display_Featured_Image_Genesis_Admin {
 	 */
 	public function featured_image_column_width() {
 		$screen = get_current_screen();
-		if ( in_array( $screen->base, array( 'edit', 'edit-tags' ) ) ) { ?>
+		if ( in_array( $screen->base, array( 'edit', 'edit-tags', 'users' ) ) ) { ?>
 			<style type="text/css">
 				.column-featured_image { width: 105px; }
 				.column-featured_image img { margin: 0 auto; display: block; height: auto; width: auto; max-width: 60px; max-height: 80px; }
+				@media screen and (max-width: 782px) { .column-featured_image img { margin: 0; } }
 			</style> <?php
 		}
+	}
+
+	/**
+	 * User column output
+	 * @param  string $value       image to be output to column
+	 * @param  string $column_name column name (featured_image)
+	 * @param  int $user_id     user id
+	 * @return string              image
+	 *
+	 * @since 2.3.0
+	 */
+	public function manage_user_column( $value, $column_name, $user_id ) {
+		if ( 'featured_image' !== $column_name ) {
+			return;
+		}
+		$image_id = get_the_author_meta( 'displayfeaturedimagegenesis', (int) $user_id );
+		if ( ! $image_id ) {
+			return;
+		}
+		$args = array(
+			'image_id' => $image_id,
+			'context'  => 'author',
+			'alt'      => get_the_author_meta( 'user_nicename', (int) $user_id ),
+		);
+
+		return $this->admin_featured_image( $args );
+
+	}
+
+	/**
+	 * Generic function to return featured image
+	 * @param  array $args array of values to pass to function ( image_id, context, alt_tag )
+	 * @return string       image html
+	 *
+	 * @since 2.3.0
+	 */
+	protected function admin_featured_image( $args ) {
+		$image_id = $args['image_id'];
+		$preview  = wp_get_attachment_image_src( $image_id, 'thumbnail' );
+		$preview  = apply_filters( "display_featured_image_genesis_admin_{$args['context']}_thumbnail", $preview, $image_id );
+		if ( ! $preview ) {
+			return;
+		}
+		return sprintf( '<img src="%1$s" alt="%2$s" />', $preview[0], $args['alt'] );
 	}
 
 }

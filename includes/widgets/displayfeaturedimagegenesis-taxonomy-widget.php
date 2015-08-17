@@ -40,7 +40,7 @@ class Display_Featured_Image_Genesis_Widget_Taxonomy extends WP_Widget {
 			'image_alignment' => '',
 			'image_size'      => 'medium',
 			'show_title'      => 0,
-			'show_content'    => 0
+			'show_content'    => 0,
 		);
 
 		$widget_ops = array(
@@ -73,7 +73,7 @@ class Display_Featured_Image_Genesis_Widget_Taxonomy extends WP_Widget {
 
 		global $wp_query, $_genesis_displayed_ids;
 
-		//* Merge with defaults
+		// Merge with defaults
 		$instance = wp_parse_args( (array) $instance, $this->defaults );
 
 		$term_id   = $instance['term'];
@@ -97,10 +97,7 @@ class Display_Featured_Image_Genesis_Widget_Taxonomy extends WP_Widget {
 		}
 
 		if ( $term_meta ) {
-			$image_id = $term_meta['term_image'];
-			if ( ! is_numeric( $term_meta['term_image'] ) ) {
-				$image_id = Display_Featured_Image_Genesis_Common::get_image_id( $term_meta['term_image'] );
-			}
+			$image_id  = displayfeaturedimagegenesis_check_image_id( $term_meta['term_image'] );
 			$image_src = wp_get_attachment_image_src( $image_id, $instance['image_size'] );
 			if ( $image_src ) {
 				$image = '<img src="' . esc_url( $image_src[0] ) . '" alt="' . esc_html( $title ) . '" />';
@@ -108,7 +105,7 @@ class Display_Featured_Image_Genesis_Widget_Taxonomy extends WP_Widget {
 
 			if ( $instance['show_image'] && $image ) {
 				$role = empty( $instance['show_title'] ) ? '' : 'aria-hidden="true"';
-				printf( '<a href="%s" title="%s" class="%s" %s>%s</a>', esc_url( $permalink ), esc_html( $title ), esc_attr( $instance['image_alignment'] ), $role, $image );
+				printf( '<a href="%s" title="%s" class="%s" %s>%s</a>', esc_url( $permalink ), esc_html( $title ), esc_attr( $instance['image_alignment'] ), esc_attr( $role  ), wp_kses_post( $image ) );
 			}
 		}
 
@@ -116,13 +113,13 @@ class Display_Featured_Image_Genesis_Widget_Taxonomy extends WP_Widget {
 
 			if ( ! empty( $instance['show_title'] ) ) {
 
-				if ( genesis_html5() )
-					printf( '<h2 class="archive-title"><a href="%s">%s</a></h2>', esc_url( $permalink ), esc_html( $title ) );
-				else
-					printf( '<h2><a href="%s">%s</a></h2>', esc_url( $permalink ), esc_html( $title ) );
+				$title_output = sprintf( '<h2><a href="%s">%s</a></h2>', esc_url( $permalink ), esc_html( $title ) );
+				if ( genesis_html5() ) {
+					$title_output = sprintf( '<h2 class="archive-title"><a href="%s">%s</a></h2>', esc_url( $permalink ), esc_html( $title ) );
+				}
+				echo wp_kses_post( $title_output );
 
 			}
-
 		}
 
 		if ( $instance['show_content'] ) {
@@ -134,7 +131,7 @@ class Display_Featured_Image_Genesis_Widget_Taxonomy extends WP_Widget {
 				$intro_text = $term->description;
 			}
 
-			echo $intro_text;
+			echo wp_kses_post( wpautop( $intro_text ) );
 
 			echo genesis_html5() ? '</div>' : '';
 
@@ -173,12 +170,12 @@ class Display_Featured_Image_Genesis_Widget_Taxonomy extends WP_Widget {
 	 */
 	function form( $instance ) {
 
-		//* Merge with defaults
+		// Merge with defaults
 		$instance = wp_parse_args( (array) $instance, $this->defaults );
 
 		?>
 		<p>
-			<label for="<?php echo esc_attr( $this->get_field_id( 'title' ) ); ?>"><?php _e( 'Title:', 'display-featured-image-genesis' ); ?> </label>
+			<label for="<?php echo esc_attr( $this->get_field_id( 'title' ) ); ?>"><?php esc_attr_e( 'Title:', 'display-featured-image-genesis' ); ?> </label>
 			<input type="text" id="<?php echo esc_attr( $this->get_field_id( 'title' ) ); ?>" name="<?php echo esc_attr( $this->get_field_name( 'title' ) ); ?>" value="<?php echo esc_attr( $instance['title'] ); ?>" class="widefat" />
 		</p>
 
@@ -187,12 +184,12 @@ class Display_Featured_Image_Genesis_Widget_Taxonomy extends WP_Widget {
 			<div class="genesis-widget-column-box genesis-widget-column-box-top">
 
 				<p>
-					<label for="<?php echo esc_attr( $this->get_field_id( 'taxonomy' ) ); ?>"><?php _e( 'Taxonomy:', 'display-featured-image-genesis' ); ?> </label>
+					<label for="<?php echo esc_attr( $this->get_field_id( 'taxonomy' ) ); ?>"><?php esc_attr_e( 'Taxonomy:', 'display-featured-image-genesis' ); ?> </label>
 					<select id="<?php echo esc_attr( $this->get_field_id( 'taxonomy' ) ); ?>" name="<?php echo esc_attr( $this->get_field_name( 'taxonomy' ) ); ?>" onchange="term_postback('<?php echo esc_attr( $this->get_field_id( 'term' ) ); ?>', this.value);" >
 					<?php
 					$args = array(
 						'public'   => true,
-						'show_ui'  => true
+						'show_ui'  => true,
 					);
 					$taxonomies = get_taxonomies( $args, 'objects' );
 
@@ -203,13 +200,13 @@ class Display_Featured_Image_Genesis_Widget_Taxonomy extends WP_Widget {
 				</p>
 
 				<p>
-					<label for="<?php echo esc_attr( $this->get_field_id( 'term' ) ); ?>"><?php _e( 'Term:', 'display-featured-image-genesis' ); ?> </label>
+					<label for="<?php echo esc_attr( $this->get_field_id( 'term' ) ); ?>"><?php esc_attr_e( 'Term:', 'display-featured-image-genesis' ); ?> </label>
 					<select id="<?php echo esc_attr( $this->get_field_id( 'term' ) ); ?>" name="<?php echo esc_attr( $this->get_field_name( 'term' ) ); ?>" >
 						<?php
 						$args   = array(
 							'orderby'    => 'name',
 							'order'      => 'ASC',
-							'hide_empty' => false
+							'hide_empty' => false,
 						);
 						$terms  = get_terms( $instance['taxonomy'], $args );
 						echo '<option value="none"' . selected( 'none', $instance['term'], false ) . '>--</option>';
@@ -225,12 +222,12 @@ class Display_Featured_Image_Genesis_Widget_Taxonomy extends WP_Widget {
 
 				<p>
 					<input id="<?php echo esc_attr( $this->get_field_id( 'show_title' ) ); ?>" type="checkbox" name="<?php echo esc_attr( $this->get_field_name( 'show_title' ) ); ?>" value="1" <?php checked( $instance['show_title'] ); ?>/>
-					<label for="<?php echo esc_attr( $this->get_field_id( 'show_title' ) ); ?>"><?php _e( 'Show Term Title', 'display-featured-image-genesis' ); ?></label>
+					<label for="<?php echo esc_attr( $this->get_field_id( 'show_title' ) ); ?>"><?php esc_attr_e( 'Show Term Title', 'display-featured-image-genesis' ); ?></label>
 				</p>
 
 				<p>
 					<input id="<?php echo esc_attr( $this->get_field_id( 'show_content' ) ); ?>" type="checkbox" name="<?php echo esc_attr( $this->get_field_name( 'show_content' ) ); ?>" value="1" <?php checked( $instance['show_content'] ); ?>/>
-					<label for="<?php echo esc_attr( $this->get_field_id( 'show_content' ) ); ?>"><?php _e( 'Show Term Intro Text', 'display-featured-image-genesis' ); ?></label>
+					<label for="<?php echo esc_attr( $this->get_field_id( 'show_content' ) ); ?>"><?php esc_attr_e( 'Show Term Intro Text', 'display-featured-image-genesis' ); ?></label>
 				</p>
 
 			</div>
@@ -243,27 +240,27 @@ class Display_Featured_Image_Genesis_Widget_Taxonomy extends WP_Widget {
 
 				<p>
 					<input id="<?php echo esc_attr( $this->get_field_id( 'show_image' ) ); ?>" type="checkbox" name="<?php echo esc_attr( $this->get_field_name( 'show_image' ) ); ?>" value="1" <?php checked( $instance['show_image'] ); ?>/>
-					<label for="<?php echo esc_attr( $this->get_field_id( 'show_image' ) ); ?>"><?php _e( 'Show Featured Image', 'display-featured-image-genesis' ); ?></label>
+					<label for="<?php echo esc_attr( $this->get_field_id( 'show_image' ) ); ?>"><?php esc_attr_e( 'Show Featured Image', 'display-featured-image-genesis' ); ?></label>
 				</p>
 
 				<p>
-					<label for="<?php echo esc_attr( $this->get_field_id( 'image_size' ) ); ?>"><?php _e( 'Image Size:', 'display-featured-image-genesis' ); ?> </label>
+					<label for="<?php echo esc_attr( $this->get_field_id( 'image_size' ) ); ?>"><?php esc_attr_e( 'Image Size:', 'display-featured-image-genesis' ); ?> </label>
 					<select id="<?php echo esc_attr( $this->get_field_id( 'image_size' ) ); ?>" class="genesis-image-size-selector" name="<?php echo esc_attr( $this->get_field_name( 'image_size' ) ); ?>">
 						<?php
 						$sizes = genesis_get_image_sizes();
-						foreach( (array) $sizes as $name => $size ) {
-							echo '<option value="' . esc_attr( $name ) . '"' . selected( $name, $instance['image_size'], FALSE ) . '>' . esc_html( $name ) . ' ( ' . absint( $size['width'] ) . 'x' . absint( $size['height'] ) . ' )</option>';
+						foreach ( (array) $sizes as $name => $size ) {
+							printf( '<option value="%s"%s>%s ( %s x %s )</option>', esc_attr( $name ), selected( $name, $instance['image_size'], false ), esc_html( $name ), (int) $size['width'], (int) $size['height'] );
 						} ?>
 					</select>
 				</p>
 
 				<p>
-					<label for="<?php echo esc_attr( $this->get_field_id( 'image_alignment' ) ); ?>"><?php _e( 'Image Alignment:', 'display-featured-image-genesis' ); ?></label>
+					<label for="<?php echo esc_attr( $this->get_field_id( 'image_alignment' ) ); ?>"><?php esc_attr_e( 'Image Alignment:', 'display-featured-image-genesis' ); ?></label>
 					<select id="<?php echo esc_attr( $this->get_field_id( 'image_alignment' ) ); ?>" name="<?php echo esc_attr( $this->get_field_name( 'image_alignment' ) ); ?>">
-						<option value="alignnone">- <?php _e( 'None', 'display-featured-image-genesis' ); ?> -</option>
-						<option value="alignleft" <?php selected( 'alignleft', $instance['image_alignment'] ); ?>><?php _e( 'Left', 'display-featured-image-genesis' ); ?></option>
-						<option value="alignright" <?php selected( 'alignright', $instance['image_alignment'] ); ?>><?php _e( 'Right', 'display-featured-image-genesis' ); ?></option>
-						<option value="aligncenter" <?php selected( 'aligncenter', $instance['image_alignment'] ); ?>><?php _e( 'Center', 'display-featured-image-genesis' ); ?></option>
+						<option value="alignnone">- <?php esc_attr_e( 'None', 'display-featured-image-genesis' ); ?> -</option>
+						<option value="alignleft" <?php selected( 'alignleft', $instance['image_alignment'] ); ?>><?php esc_attr_e( 'Left', 'display-featured-image-genesis' ); ?></option>
+						<option value="alignright" <?php selected( 'alignright', $instance['image_alignment'] ); ?>><?php esc_attr_e( 'Right', 'display-featured-image-genesis' ); ?></option>
+						<option value="aligncenter" <?php selected( 'aligncenter', $instance['image_alignment'] ); ?>><?php esc_attr_e( 'Center', 'display-featured-image-genesis' ); ?></option>
 					</select>
 				</p>
 
@@ -284,23 +281,22 @@ class Display_Featured_Image_Genesis_Widget_Taxonomy extends WP_Widget {
 		$args  = array(
 			'orderby'    => 'name',
 			'order'      => 'ASC',
-			'hide_empty' => false
+			'hide_empty' => false,
 		);
 		$terms = get_terms( $_POST['taxonomy'], $args );
 
 		// Build an appropriate JSON response containing this info
 		$list['none'] = '--';
 		foreach ( $terms as $term ) {
-			$list[$term->term_id] = esc_attr( $term->name );
+			$list[ $term->term_id ] = esc_attr( $term->name );
 		}
 
 		// And emit it
+		$emit = json_encode( $list );
 		if ( function_exists( 'wp_json_encode' ) ) {
-			echo wp_json_encode( $list );
+			$emit = wp_json_encode( $list );
 		}
-		else {
-			echo json_encode( $list );
-		}
+		echo $emit;
 		die();
 	}
 

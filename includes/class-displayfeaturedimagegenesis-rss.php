@@ -17,13 +17,13 @@ class Display_Featured_Image_Genesis_RSS {
 	 */
 	public function maybe_do_feed() {
 
-		$displaysetting = get_option( 'displayfeaturedimagegenesis' );
+		$settings       = new Display_Featured_Image_Genesis_Settings();
+		$displaysetting = $settings->get_display_setting();
 		$feed_image     = $displaysetting['feed_image'];
-		$rss_option     = get_option( 'rss_use_excerpt' );
 		$post_types     = array();
 		$skipped_types  = apply_filters( 'display_featured_image_genesis_skipped_posttypes', $post_types );
 
-		//* if the user isn't sending images to the feed, we're done
+		// if the user isn't sending images to the feed, we're done
 		if ( ! $feed_image || ( in_array( get_post_type(), $skipped_types ) ) ) {
 			return;
 		}
@@ -31,6 +31,7 @@ class Display_Featured_Image_Genesis_RSS {
 		// if the feed is summary, filter the excerpt
 		$which_filter = 'the_excerpt_rss';
 		$priority     = 1000;
+		$rss_option   = get_option( 'rss_use_excerpt' );
 		// if the feed is full text, filter the content
 		if ( '0' === $rss_option ) {
 			$which_filter = 'the_content_feed';
@@ -50,24 +51,35 @@ class Display_Featured_Image_Genesis_RSS {
 	public function add_image_to_feed( $content ) {
 
 		// if the post doesn't have a thumbnail, we're done here
-		if ( ! has_post_thumbnail() ) {
+		if ( ! has_post_thumbnail() && ! is_feed() ) {
 			return $content;
 		}
 
+		$rss_option = get_option( 'rss_use_excerpt' );
 		// first check: see if the featured image already exists in full in the content
 		$size = 'original';
 		if ( class_exists( 'SendImagesRSS' ) ) {
-			$simplify = get_option( 'sendimagesrss_simplify_feed' );
-			$alt_feed = get_option( 'sendimagesrss_alternate_feed' );
 
-			if ( ! $simplify && ( ( $alt_feed && is_feed( 'email' ) ) || ! $alt_feed ) ) {
-				$size  = 'mailchimp';
+			if ( '1' === $rss_option && class_exists( 'SendImagesRSS_Excerpt_Fixer' ) ) {
+				// if the newer version of Send Images to RSS is installed, bail here because it's better.
+				return $content;
+			}
+			$rss_setting = get_option( 'sendimagesrss' );
+			if ( ! $rss_setting ) {
+				$defaults = array(
+					'simplify_feed'  => get_option( 'sendimagesrss_simplify_feed', 0 ),
+					'alternate_feed' => get_option( 'sendimagesrss_alternate_feed', 0 ),
+				);
+
+				$rss_setting = get_option( 'sendimagesrss', $defaults );
+			}
+			if ( ! $rss_setting['simplify_feed'] && ( ( $rss_setting['alternate_feed'] && is_feed( 'email' ) ) || ! $rss_setting['alternate_feed'] ) ) {
+				$size = 'mailchimp';
 			}
 		}
 
 		$post_thumbnail = wp_get_attachment_image_src( get_post_thumbnail_id(), $size );
 		$image_content  = strpos( $content, 'src="' . $post_thumbnail[0] );
-		$rss_option     = get_option( 'rss_use_excerpt' );
 
 		// if the featured image already exists in all its glory in the content, we're done here
 		if ( false !== $image_content && '0' === $rss_option ) {
@@ -77,10 +89,8 @@ class Display_Featured_Image_Genesis_RSS {
 		// reset size to large so we don't send huge files to the feed
 		$size = 'large';
 		if ( class_exists( 'SendImagesRSS' ) ) {
-			$simplify = get_option( 'sendimagesrss_simplify_feed' );
-			$alt_feed = get_option( 'sendimagesrss_alternate_feed' );
 			// if the user is using Send Images to RSS, send the right images to the right feeds
-			if ( ! $simplify && ( ( $alt_feed && is_feed( 'email' ) ) || ! $alt_feed ) ) {
+			if ( ! $rss_setting['simplify_feed'] && ( ( $rss_setting['alternate_feed'] && is_feed( 'email' ) ) || ! $rss_setting['alternate_feed'] ) ) {
 				$size  = 'mailchimp';
 				$class = 'rss-mailchimp';
 			}
@@ -94,13 +104,21 @@ class Display_Featured_Image_Genesis_RSS {
 		if ( '1' === $rss_option ) {
 			$size  = 'thumbnail';
 			$align = 'left';
-			$style = 'margin:0px 0px 20px 20px;';
+			$style = 'margin:0px 20px 20px 0px;';
 			$class = 'rss-small';
 		}
 
 		// whew. build the image!
-		$image   = get_the_post_thumbnail( get_the_ID(), $size, array( 'align' => $align, 'style' => $style, 'class' => $class ) );
-		$image   = apply_filters( 'display_featured_image_genesis_modify_rss_image', wp_kses_post( $image ) );
+		$image = get_the_post_thumbnail(
+			get_the_ID(),
+			$size,
+			array(
+				'align' => $align,
+				'style' => $style,
+				'class' => $class,
+			)
+		);
+		$image = apply_filters( 'display_featured_image_genesis_modify_rss_image', $image );
 
 		return $image . $content;
 

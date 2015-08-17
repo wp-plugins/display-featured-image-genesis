@@ -29,8 +29,8 @@ jQuery(document).ready(function($){
 		custom_uploader.on( 'select', function() {
 
 			attachment   = custom_uploader.state().get( 'selection' ).first().toJSON();
-			preview      = $( target_input ).prevAll( '#upload_logo_preview' );
-			previewImage = $( '<div id="upload_logo_preview"><img width="300" src="' + attachment.url + '" /></div>' );
+			preview      = $( target_input ).prevAll( '.upload_logo_preview' );
+			previewImage = $( '<div class="upload_logo_preview"><img width="300" src="' + attachment.url + '" /></div>' );
 			$( target_input ).val( attachment.id );
 			if ( $( preview ).length ) {
 				$( preview ).remove();
@@ -46,7 +46,7 @@ jQuery(document).ready(function($){
 	$( '.delete_image' ).click( function() {
 
 		target_input = $(this).prevAll( '.upload_image_id' );
-		previewView  = $(this).prevAll( '#upload_logo_preview' );
+		previewView  = $(this).prevAll( '.upload_logo_preview' );
 
 		$( target_input ).val( '' );
 		$( previewView ).remove();
@@ -55,7 +55,7 @@ jQuery(document).ready(function($){
 
 	$( '#submit' ).click( function() {
 		submitButton = $(this).parentsUntil( '#addtag' );
-		previewView  = submitButton.siblings( '.term-image-wrap' ).children( '#upload_logo_preview' );
+		previewView  = submitButton.siblings( '.term-image-wrap' ).children( '.upload_logo_preview' );
 		clearInput   = submitButton.siblings( '.term-image-wrap' ).children( '.upload_image_id' );
 
 		if ( $( previewView ).length && $( submitButton ).length ) {
